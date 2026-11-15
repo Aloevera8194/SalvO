@@ -59,7 +59,8 @@ nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
 <section id="s-check">
   <div id="cover"></div>
   <h2>Ajustes</h2>
-  <div class="row"><div><label>Pessoas</label><input id="cp" type="number" inputmode="decimal" onchange="setCfg()"></div><div><label>Meta (dias)</label><input id="cd" type="number" inputmode="decimal" onchange="setCfg()"></div></div>
+  <label>Tipo da mochila</label><select id="ptype" onchange="setType()"><option value="individual">Individual</option><option value="familia">Família</option></select>
+  <div class="row"><div id="prow"><label>Pessoas</label><input id="cp" type="number" inputmode="decimal" onchange="setCfg()"></div><div><label>Meta (dias)</label><input id="cd" type="number" inputmode="decimal" onchange="setCfg()"></div></div>
   <div class="row"><div><label>Água (L/pessoa/dia; 0 = não exigir)</label><input id="cw" type="number" inputmode="decimal" step="any" onchange="setCfg()"></div><div><label>Porções/pessoa/dia</label><input id="cf" type="number" inputmode="decimal" step="any" onchange="setCfg()"></div></div>
   <p class="mut">Referência da Defesa Civil Nacional: kit para 72 horas (3 dias), com 2 litros de água por pessoa por dia.</p>
   <div class="acts"><button class="mini ghost" onclick="packRename()">Renomear mochila</button><button class="mini ghost" onclick="packDel()">Excluir mochila</button></div>
@@ -79,6 +80,12 @@ nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
   <button class="full ghost" id="cancelbtn" style="display:none;margin-top:8px" onclick="cancelEdit()">Cancelar edição</button>
 </section>
 </main>
+<input type="file" id="bk" style="display:none" onchange="importBk(this)">
+<div id="mdl" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:20px;z-index:10"><div class="card" style="width:100%;margin:0;border-left-width:1px">
+<h3>Nova mochila</h3><label>Nome</label><input id="pn" placeholder="Ex.: Mochila do Rafael">
+<label>Tipo</label><select id="pt" onchange="$('#pprow').style.display=this.value==='familia'?'block':'none'"><option value="individual">Individual (1 pessoa)</option><option value="familia">Família (várias pessoas)</option></select>
+<div id="pprow" style="display:none"><label>Quantas pessoas?</label><input id="pp" type="number" inputmode="numeric" value="3"></div>
+<div class="row" style="margin-top:14px"><button class="ghost" onclick="$('#mdl').style.display='none'">Cancelar</button><button onclick="packCreate()">Criar</button></div></div></div>
 <div id="toast"></div>
 <nav>
   <button data-t="resumo" onclick="show('resumo')">Alertas</button>
@@ -107,7 +114,43 @@ const today=()=>{const t=new Date();return t.getFullYear()+'-'+String(t.getMonth
 const daysSince=d=>Math.round((new Date(today()+'T12:00:00')-new Date(d+'T12:00:00'))/864e5);
 const CHK0=[['Equipamentos e ferramentas',['Apito de longo alcance','Canivete multifuncional','Lanterna de dínamo (ou com pilhas extras)','Corda (3 metros / 6 mm)','Isqueiro e velas','Capa de chuva','Garrafa de água (500 ml)','Talheres descartáveis']],['Primeiros socorros e documentos',['Manta térmica aluminizada','Máscaras (KN95 ou descartáveis)','Gaze, ataduras e curativos','Luvas descartáveis','Soro fisiológico (100 ml)','Hipoclorito de sódio (30 ml, para purificar água)','Porta-documentos impermeável (cópias de RG, CPF e certidões)','Porta-remédios (medicações de uso contínuo)']],['Higiene pessoal',['Necessaire','Escova, creme dental e fio dental','Sabonete','Pente e lixa de unha','Absorventes','Repelente','Álcool em gel']]];
 let packs=L('sv_packs')||[{id:'mochila',name:'Mochila de emergência',cfg:Object.assign({p:1,d:3,w:2,f:3},L('sv_cfg')||{}),chk:L('sv_chk')||{},list:L('sv_chklist')||JSON.parse(JSON.stringify(CHK0)),rev:localStorage.getItem('sv_rev')||today()}];
-function packAdd(){const n=(prompt('Nome da mochila (ex.: Mochila do Rafael)')||'').trim();if(!n)return;packs.push({id:'p'+Date.now(),name:n,cfg:{p:1,d:3,w:2,f:3},chk:{},list:JSON.parse(JSON.stringify(CHK0)),rev:today()});save();render();toast('Mochila criada. Toque nela para começar.')}
+const FAM=['Família',['Itens para crianças ou idosos (fraldas, lenços, leite etc.)','Rádio a pilha ou de dínamo','Contatos e ponto de encontro da família','Cópias dos documentos de todos','Remédios de cada pessoa, identificados']];
+const defList=t=>{const l=JSON.parse(JSON.stringify(CHK0));if(t==='familia')l.push(JSON.parse(JSON.stringify(FAM)));return l};
+const ptype=p=>p.type||(p.cfg.p>1?'familia':'individual');
+function packAdd(){$('#pn').value='';$('#pt').value='individual';$('#pprow').style.display='none';$('#mdl').style.display='flex'}
+function packCreate(){
+  const n=$('#pn').value.trim();if(!n)return toast('Dê um nome para a mochila.');
+  const t=$('#pt').value,pp=Math.max(2,parseInt($('#pp').value)||3);
+  packs.push({id:'p'+Date.now(),name:n,type:t,cfg:{p:t==='familia'?pp:1,d:3,w:0.33,f:3},chk:{},list:defList(t),rev:today()});
+  $('#mdl').style.display='none';save();render();toast('Mochila criada. Toque nela para começar.');
+}
+function setType(){
+  const p=P(),t=$('#ptype').value;p.type=t;
+  if(t==='individual')p.cfg.p=1;else{if(p.cfg.p<2)p.cfg.p=2;if(!p.list.some(g=>g[0]===FAM[0]))p.list.push(JSON.parse(JSON.stringify(FAM)))}
+  save();setCfgInputs();render();
+}
+/* Backup */
+const bkData=()=>({app:'SalvO',v:2,date:today(),items,rates,known,packs});
+async function exportBk(){
+  const txt=JSON.stringify(bkData()),name='salvo-backup-'+today()+'.json',C=window.Capacitor&&Capacitor.Plugins;
+  try{
+    if(C&&C.Filesystem&&C.Share){
+      const r=await C.Filesystem.writeFile({path:name,data:txt,directory:'CACHE',encoding:'utf8'});
+      await C.Share.share({title:'Backup SalvO',dialogTitle:'Salvar backup (ex.: Google Drive)',url:r.uri});
+    }else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download=name;a.click()}
+  }catch(e){if(!/cancel/i.test(String(e&&e.message||e)))toast('Não foi possível exportar: '+(e&&e.message||e))}
+}
+function pickBk(){$('#bk').click()}
+function importBk(inp){
+  const f=inp.files&&inp.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{
+    const d=JSON.parse(r.result);if(d.app!=='SalvO'||!Array.isArray(d.items)||!Array.isArray(d.packs))throw 0;
+    if(!confirm('Restaurar o backup de '+(d.date||'data desconhecida')+'? Isso substitui todos os dados atuais.'))return;
+    items=d.items;rates=d.rates||{};known=d.known||{};packs=d.packs;sp=null;save();goHome();toast('Backup restaurado.');
+  }catch(e){toast('Arquivo de backup inválido.')}};
+  r.readAsText(f);inp.value='';
+}
 function packRename(){const p=P(),n=(prompt('Novo nome da mochila',p.name)||'').trim();if(!n)return;p.name=n;save();show('check')}
 function packDel(){const p=P();if(!confirm('Excluir "'+p.name+'" e todos os itens dela?'))return;items=items.filter(i=>sOf(i)!==p.id);packs=packs.filter(x=>x.id!==p.id);save();goHome()}
 function cover(p=P()){
@@ -123,12 +166,12 @@ function setCfg(){
   const g=id=>{const v=parseFloat(($('#'+id).value||'').replace(',','.'));return v>0?v:null};
   const cfg=P().cfg,gw=(()=>{const v=parseFloat(($('#cw').value||'').replace(',','.'));return v>=0?v:cfg.w})();P().cfg={p:g('cp')||cfg.p,d:g('cd')||cfg.d,w:gw,f:g('cf')||cfg.f};save();setCfgInputs();render();
 }
-function setCfgInputs(){const cfg=P().cfg;$('#cp').value=cfg.p;$('#cd').value=cfg.d;$('#cw').value=cfg.w;$('#cf').value=cfg.f}
+function setCfgInputs(){const cfg=P().cfg;$('#ptype').value=ptype(P());$('#prow').style.display=ptype(P())==='familia'?'':'none';$('#cp').value=cfg.p;$('#cd').value=cfg.d;$('#cw').value=cfg.w;$('#cf').value=cfg.f}
 function chkAdd(g){const t=(prompt('Novo item')||'').trim();if(!t)return;P().list[g][1].push(t);save();renderCheck()}
 function chkDel(g,i){const p=P(),t=p.list[g][1][i];p.list[g][1].splice(i,1);delete p.chk[t];save();renderCheck()}
 function chkGroupAdd(){const t=(prompt('Nome do novo grupo')||'').trim();if(!t)return;P().list.push([t,[]]);save();renderCheck()}
 function chkGroupDel(g){if(!confirm('Remover o grupo e todos os itens dele?'))return;const p=P();p.list[g][1].forEach(t=>delete p.chk[t]);p.list.splice(g,1);save();renderCheck()}
-function chkReset(){if(!confirm('Restaurar a lista padrão? Suas alterações na lista serão perdidas.'))return;P().list=JSON.parse(JSON.stringify(CHK0));P().chk={};save();renderCheck()}
+function chkReset(){if(!confirm('Restaurar a lista padrão? Suas alterações na lista serão perdidas.'))return;P().list=defList(ptype(P()));P().chk={};save();renderCheck()}
 function tick(el){const c=P().chk;if(el.checked)c[el.dataset.t]=1;else delete c[el.dataset.t];save();renderCheck()}
 function conferi(){P().rev=today();save();render();toast('Conferência registrada. Próximo aviso em 6 meses.')}
 function tpHint(){const h={agua:'Conta em litros (L ou ml).',alimento:'1 lata, barra ou pacote = 1 porção (use a unidade un).',purif:'Informe quantos litros este item purifica (veja na embalagem). Ex.: pastilhas que tratam 12 L.'};$('#tphint').textContent=h[$('#tp').value]||''}
@@ -165,7 +208,7 @@ function show(t){
   $('nav').style.display=t==='home'?'none':'flex';$('#back').style.display=t==='home'?'none':'block';
   document.body.className=isPack(sp)?'m':'';
   $('#savebtn').textContent=editId?'Salvar alterações':'Guardar';$('#cancelbtn').style.display=editId?'block':'none';
-  $('#ht').textContent=sp?nameOf(sp):'SalvO';$('#hs').textContent=sp?(isPack(sp)?'Itens para levar em uma emergência':'Seus alimentos e validades'):'Escolha o que organizar';
+  $('#ht').textContent=sp?nameOf(sp):'SalvO';$('#hs').textContent=sp?(isPack(sp)?(ptype(P(sp))==='familia'?'Mochila da família · '+P(sp).cfg.p+' pessoas':'Mochila individual'):'Seus alimentos e validades'):'Escolha o que organizar';
   $('#mrow').style.display=isPack(sp)?'none':'block';$('#tprow').style.display=isPack(sp)?'block':'none';$('#navchk').style.display=isPack(sp)?'':'none';if(isPack(sp))setCfgInputs();
   $('#loc').placeholder=isPack(sp)?'Ex.: bolso da frente':'Ex.: Prateleira 2, caixa B';
   render();
@@ -201,7 +244,7 @@ function alerts(s){
 function renderHome(){
   $('#s-home').innerHTML=['dispensa',...packs.map(p=>p.id)].map(s=>{
     const a=alerts(s),c=a.exp.length+a.risk.length+a.soon.length+a.low.length+(a.cov?1:0)+(a.rev?1:0),n=items.filter(i=>sOf(i)===s).length;
-    return `<div class="space ${s==='dispensa'?'d':'m'}" onclick="openSp('${s}')">${ICON[isPack(s)?'mochila':'dispensa']}<div><h3>${esc(nameOf(s))}</h3><div>${n} item(ns)${isPack(s)?' · autonomia '+num(cover(P(s)).days)+' de '+P(s).cfg.d+' dias':''}${c?' · '+c+' alerta(s)':''}</div></div>${c?`<span class="pill">${c}</span>`:''}</div>`}).join('')+'<button class="ghost full" onclick="packAdd()">+ Nova mochila</button>';
+    return `<div class="space ${s==='dispensa'?'d':'m'}" onclick="openSp('${s}')">${ICON[isPack(s)?'mochila':'dispensa']}<div><h3>${esc(nameOf(s))}</h3><div>${n} item(ns)${isPack(s)?' · '+(ptype(P(s))==='familia'?P(s).cfg.p+' pessoas':'individual')+' · autonomia '+num(cover(P(s)).days)+' de '+P(s).cfg.d+' dias':''}${c?' · '+c+' alerta(s)':''}</div></div>${c?`<span class="pill">${c}</span>`:''}</div>`}).join('')+'<button class="ghost full" onclick="packAdd()">+ Nova mochila</button><h2>Backup</h2><div class="row"><button class="ghost" onclick="exportBk()">Exportar</button><button class="ghost" onclick="pickBk()">Importar</button></div><p class="mut">Exporte e escolha o Google Drive na tela de compartilhar. Para restaurar, importe o arquivo salvo.</p>';
 }
 function renderResumo(){
   const a=alerts(sp);let h='';
