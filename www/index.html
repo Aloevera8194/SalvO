@@ -41,6 +41,11 @@ nav button{flex:1;background:none;color:var(--mut);border-radius:0;padding:14px 
 nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
 #toast{position:fixed;left:16px;right:16px;bottom:96px;background:#16221d;color:#fff;padding:12px;border-radius:8px;display:none;text-align:center}
 .empty{text-align:center;color:var(--mut);padding:30px 10px}
+.bar{height:8px;background:#e4e9e1;border-radius:4px;overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;background:var(--ok)}
+.ck{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px dashed var(--line);font-size:15px}
+.ck input{width:22px;height:22px;flex:none;padding:0}
+.ck:has(input:checked) span{color:var(--mut);text-decoration:line-through}
 </style></head><body>
 <header><button id="back" onclick="goHome()">‹</button><div><h1 id="ht">SalvO</h1><p id="hs">Escolha o que organizar</p></div></header>
 <main>
@@ -50,8 +55,17 @@ nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
   <input id="q" placeholder="Buscar produto ou local" oninput="renderItens()">
   <div id="lista" style="margin-top:12px"></div>
 </section>
+<section id="s-check">
+  <div id="cover"></div>
+  <h2>Ajustes</h2>
+  <div class="row"><div><label>Pessoas</label><input id="cp" type="number" inputmode="decimal" onchange="setCfg()"></div><div><label>Meta (dias)</label><input id="cd" type="number" inputmode="decimal" onchange="setCfg()"></div></div>
+  <div class="row"><div><label>Água (L/pessoa/dia)</label><input id="cw" type="number" inputmode="decimal" step="any" onchange="setCfg()"></div><div><label>Porções/pessoa/dia</label><input id="cf" type="number" inputmode="decimal" step="any" onchange="setCfg()"></div></div>
+  <p class="mut">Referência da Defesa Civil Nacional: kit para 72 horas (3 dias), com 2 litros de água por pessoa por dia.</p>
+  <h2 id="chkh">Checklist</h2><div id="chk"></div><div id="rv" style="margin-top:14px"></div>
+</section>
 <section id="s-novo">
   <button class="ghost full" style="margin-top:0" onclick="scan()">Ler código de barras com a câmera</button>
+  <div id="tprow"><label>Tipo</label><select id="tp" onchange="onTipo()"><option value="outro">Outro item</option><option value="agua">Água (conta na autonomia)</option><option value="alimento">Alimento (1 lata, barra ou pacote = 1 un)</option></select></div>
   <label>Produto</label><input id="n" onchange="prefill()">
   <div class="row"><div><label>Quantidade</label><input id="qt" type="number" inputmode="decimal" step="any"></div>
   <div class="sm"><label>Unidade</label><select id="u"><option>kg</option><option>g</option><option>L</option><option>ml</option><option>un</option></select></div></div>
@@ -66,23 +80,61 @@ nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
 <nav>
   <button data-t="resumo" onclick="show('resumo')">Alertas</button>
   <button data-t="itens" onclick="show('itens')">Itens</button>
+  <button data-t="check" id="navchk" onclick="show('check')">Checklist</button>
   <button data-t="novo" onclick="show('novo')">Adicionar</button>
 </nav>
 <script>
 const $=s=>document.querySelector(s);
 const L=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
-let items=L('sv_items')||[],rates=L('sv_rates')||{},known=L('sv_known')||{},sp=null;
+let items=L('sv_items')||[],rates=L('sv_rates')||{},known=L('sv_known')||{},sp=null,cfg=Object.assign({p:1,d:3,w:2,f:3},L('sv_cfg')||{}),chk=L('sv_chk')||{};
 const sOf=i=>i.space||'dispensa';
 const NAME={dispensa:'Dispensa',mochila:'Mochila de emergência'};
 const ICON={
  dispensa:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><rect x="9" y="6" width="46" height="52" rx="5"/><path d="M9 23h46M9 40h46"/><rect x="15" y="11" width="9" height="12" fill="currentColor" stroke="none"/><rect x="28" y="14" width="8" height="9" fill="currentColor" stroke="none"/><rect x="18" y="28" width="12" height="12" fill="currentColor" stroke="none"/><rect x="38" y="30" width="9" height="10" fill="currentColor" stroke="none"/></svg>',
  mochila:'<svg viewBox="0 0 64 64"><path d="M24 15c0-6 3-9 8-9s8 3 8 9" fill="none" stroke="currentColor" stroke-width="3.5"/><rect x="8" y="34" width="6" height="16" rx="2" fill="currentColor" opacity=".6"/><rect x="50" y="34" width="6" height="16" rx="2" fill="currentColor" opacity=".6"/><rect x="13" y="13" width="38" height="46" rx="11" fill="currentColor"/><path d="M19 30h26" stroke="#181c1a" stroke-width="2.5"/><rect x="20" y="36" width="24" height="17" rx="5" fill="#181c1a"/></svg>'};
-const save=()=>{localStorage.setItem('sv_items',JSON.stringify(items));localStorage.setItem('sv_rates',JSON.stringify(rates));localStorage.setItem('sv_known',JSON.stringify(known));notify()};
+const save=()=>{localStorage.setItem('sv_items',JSON.stringify(items));localStorage.setItem('sv_rates',JSON.stringify(rates));localStorage.setItem('sv_known',JSON.stringify(known));localStorage.setItem('sv_cfg',JSON.stringify(cfg));localStorage.setItem('sv_chk',JSON.stringify(chk));notify()};
 const key=n=>n.trim().toLowerCase();
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const num=n=>(+n.toFixed(2)).toLocaleString('pt-BR');
 const dleft=d=>{const t=new Date();t.setHours(12,0,0,0);return Math.round((new Date(d+'T12:00:00')-t)/864e5)};
 const br=d=>d.split('-').reverse().join('/');
+const today=()=>{const t=new Date();return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')};
+let rev=localStorage.getItem('sv_rev')||today();localStorage.setItem('sv_rev',rev);
+const daysSince=d=>Math.round((new Date(today()+'T12:00:00')-new Date(d+'T12:00:00'))/864e5);
+const CHK=[['Equipamentos e ferramentas',['Apito de longo alcance','Canivete multifuncional','Lanterna de dínamo (ou com pilhas extras)','Corda (3 metros / 6 mm)','Isqueiro e velas','Capa de chuva','Garrafa de água (500 ml)','Talheres descartáveis']],['Primeiros socorros e documentos',['Manta térmica aluminizada','Máscaras (KN95 ou descartáveis)','Gaze, ataduras e curativos','Luvas descartáveis','Soro fisiológico (100 ml)','Hipoclorito de sódio (30 ml, para purificar água)','Porta-documentos impermeável (cópias de RG, CPF e certidões)','Porta-remédios (medicações de uso contínuo)']],['Higiene pessoal',['Necessaire','Escova, creme dental e fio dental','Sabonete','Pente e lixa de unha','Absorventes','Repelente','Álcool em gel']]];
+function cover(){
+  let w=0,f=0;
+  items.filter(i=>sOf(i)==='mochila'&&dleft(i.exp)>=0).forEach(i=>{
+    if(i.tp==='agua')w+=i.unit==='L'?i.qty:i.unit==='ml'?i.qty/1000:0;
+    else if(i.tp==='alimento'&&i.unit==='un')f+=i.qty});
+  const wd=w/(cfg.p*cfg.w),fd=f/(cfg.p*cfg.f);
+  return{w,f,wd,fd,days:Math.min(wd,fd)};
+}
+function setCfg(){
+  const g=id=>{const v=parseFloat(($('#'+id).value||'').replace(',','.'));return v>0?v:null};
+  cfg={p:g('cp')||cfg.p,d:g('cd')||cfg.d,w:g('cw')||cfg.w,f:g('cf')||cfg.f};save();setCfgInputs();render();
+}
+function setCfgInputs(){$('#cp').value=cfg.p;$('#cd').value=cfg.d;$('#cw').value=cfg.w;$('#cf').value=cfg.f}
+function tick(el){if(el.checked)chk[el.dataset.t]=1;else delete chk[el.dataset.t];save();renderCheck()}
+function conferi(){rev=today();localStorage.setItem('sv_rev',rev);save();render();toast('Conferência registrada. Próximo aviso em 6 meses.')}
+function onTipo(){
+  const t=$('#tp').value,u=$('#u').value;
+  if(t==='alimento'){if(u!=='un')$('#qt').value=1;$('#u').value='un'}
+  else if(t==='agua'&&u!=='L'&&u!=='ml')$('#u').value='L';
+}
+function renderCheck(){
+  const v=cover(),bar=(x,m)=>`<div class="bar"><i style="width:${Math.min(100,x/m*100)}%"></i></div>`;
+  const nw=Math.max(0,cfg.d*cfg.p*cfg.w-v.w),nf=Math.max(0,cfg.d*cfg.p*cfg.f-v.f),ok=nw<0.001&&nf<0.001;
+  $('#cover').innerHTML=`<div class="card ${ok?'':'warn'}"><h3>Autonomia: ${num(v.days)} de ${cfg.d} dias</h3>
+  <div class="mut">Água: ${num(v.w)} L · ${num(v.wd)} dia(s)</div>${bar(v.wd,cfg.d)}
+  <div class="mut" style="margin-top:8px">Alimento: ${num(v.f)} porções · ${num(v.fd)} dia(s)</div>${bar(v.fd,cfg.d)}
+  <div style="margin-top:8px" class="${ok?'':'warn-t'}">${ok?'Mochila pronta para '+cfg.d+' dias.':'Faltam '+(nw>=0.001?num(nw)+' L de água':'')+(nw>=0.001&&nf>=0.001?' e ':'')+(nf>=0.001?num(nf)+' porções de alimento':'')+'.'}</div>
+  <div class="mut" style="margin-top:6px">Só conta o que está dentro da validade. Cadastre água e alimentos em Adicionar, escolhendo o tipo.</div></div>`;
+  let tot=0,done=0,h='';
+  CHK.forEach(([t,l])=>{h+=`<h2>${t}</h2>`;l.forEach(x=>{tot++;if(chk[x])done++;h+=`<label class="ck"><input type="checkbox" ${chk[x]?'checked':''} data-t="${esc(x)}" onchange="tick(this)"><span>${esc(x)}</span></label>`})});
+  $('#chkh').textContent=`Checklist (${done}/${tot})`;$('#chk').innerHTML=h;
+  $('#rv').innerHTML=`<div class="card ${daysSince(rev)>180?'warn':''}"><h3>Revisão da mochila</h3><div class="mut">Última conferência: ${br(rev)}. A Defesa Civil recomenda conferir as validades a cada 6 meses.</div><div class="acts"><button class="mini" onclick="conferi()">Conferi hoje</button></div></div>`;
+}
 function toast(t){const el=$('#toast');el.textContent=t;el.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>el.style.display='none',3500)}
 
 function show(t){
@@ -91,7 +143,7 @@ function show(t){
   $('nav').style.display=t==='home'?'none':'flex';$('#back').style.display=t==='home'?'none':'block';
   document.body.className=sp==='mochila'?'m':'';
   $('#ht').textContent=sp?NAME[sp]:'SalvO';$('#hs').textContent=sp?(sp==='mochila'?'Itens para levar em uma emergência':'Seus alimentos e validades'):'Escolha o que organizar';
-  $('#mrow').style.display=sp==='mochila'?'none':'block';
+  $('#mrow').style.display=sp==='mochila'?'none':'block';$('#tprow').style.display=sp==='mochila'?'block':'none';$('#navchk').style.display=sp==='mochila'?'':'none';
   $('#loc').placeholder=sp==='mochila'?'Ex.: bolso da frente':'Ex.: Prateleira 2, caixa B';
   render();
 }
@@ -119,16 +171,19 @@ function alerts(s){
     exp:gs.filter(g=>g.lots.some(l=>l.d<0)),
     risk:gs.filter(g=>g.perDay&&g.lots.some(l=>l.d>=0&&l.waste>0.005)),
     soon:gs.filter(g=>!g.perDay&&g.lots.some(l=>l.d>=0&&l.d<=lim)),
-    low:s==='mochila'?[]:gs.filter(g=>g.perDay&&g.left<10)};
+    low:s==='mochila'?[]:gs.filter(g=>g.perDay&&g.left<10),
+    cov:s==='mochila'&&cover().days<cfg.d-0.001,rev:s==='mochila'&&daysSince(rev)>180};
 }
 
 function renderHome(){
   $('#s-home').innerHTML=['dispensa','mochila'].map(s=>{
-    const a=alerts(s),c=a.exp.length+a.risk.length+a.soon.length+a.low.length,n=items.filter(i=>sOf(i)===s).length;
-    return `<div class="space ${s[0]}" onclick="openSp('${s}')">${ICON[s]}<div><h3>${NAME[s]}</h3><div>${n} item(ns)${c?' · '+c+' alerta(s)':''}</div></div>${c?`<span class="pill">${c}</span>`:''}</div>`}).join('');
+    const a=alerts(s),c=a.exp.length+a.risk.length+a.soon.length+a.low.length+(a.cov?1:0)+(a.rev?1:0),n=items.filter(i=>sOf(i)===s).length;
+    return `<div class="space ${s[0]}" onclick="openSp('${s}')">${ICON[s]}<div><h3>${NAME[s]}</h3><div>${n} item(ns)${s==='mochila'?' · autonomia '+num(cover().days)+' de '+cfg.d+' dias':''}${c?' · '+c+' alerta(s)':''}</div></div>${c?`<span class="pill">${c}</span>`:''}</div>`}).join('');
 }
 function renderResumo(){
   const a=alerts(sp);let h='';
+  if(a.cov){const v=cover();h+=`<h2>Autonomia da mochila</h2><div class="card warn"><h3>Cobre ${num(v.days)} de ${cfg.d} dias</h3><div class="mut">Água: ${num(v.w)} L · Alimento: ${num(v.f)} porções. Veja o Checklist para o que falta.</div></div>`}
+  if(a.rev)h+=`<h2>Revisão</h2><div class="card warn"><h3>Hora de revisar a mochila</h3><div class="mut">Última conferência há ${daysSince(rev)} dias. Confira validades e o checklist.</div></div>`;
   if(a.exp.length){h+='<h2>Vencidos</h2>';a.exp.forEach(g=>g.lots.filter(l=>l.d<0).forEach(l=>h+=`<div class="card bad"><h3>${esc(g.name)}</h3><span class="bad-t">${num(l.qty)} ${g.unit} venceu em ${br(l.exp)}</span><div class="mut">${esc(l.loc||'')}</div></div>`))}
   if(a.risk.length){h+='<h2>Risco de perda</h2>';a.risk.forEach(g=>{
     const w=g.lots.filter(l=>l.d>=0).reduce((s,l)=>s+l.waste,0),f=g.lots.find(l=>l.d>=0&&l.waste>0.005);
@@ -150,7 +205,7 @@ function renderItens(){
   });
   $('#lista').innerHTML=h||'<div class="empty">Nada encontrado.</div>';
 }
-function render(){if(!sp)renderHome();else{renderResumo();renderItens()}}
+function render(){if(!sp)renderHome();else{renderResumo();renderItens();if(sp==='mochila')renderCheck()}}
 
 function use(k){
   const g=groups(sp).find(x=>x.k===k);if(!g)return;
@@ -172,11 +227,11 @@ function add(){
   const name=$('#n').value.trim(),qty=parseFloat($('#qt').value),exp=$('#e').value;
   if(!name||!(qty>0)||!exp)return toast('Preencha produto, quantidade e validade.');
   const u=$('#u').value,code=$('#code').value;
-  items.push({id:Date.now(),space:sp,name,qty,unit:u,exp,loc:$('#loc').value.trim(),code});
+  items.push({id:Date.now(),space:sp,tp:sp==='mochila'?$('#tp').value:undefined,name,qty,unit:u,exp,loc:$('#loc').value.trim(),code});
   const m=parseFloat($('#m').value);
   if(sp==='dispensa'&&m>=0&&$('#m').value!=='')rates[key(name)]={m,unit:u};
   if(code)known[code]={name,unit:u};
-  save();['n','qt','e','loc','m','code'].forEach(i=>$('#'+i).value='');
+  save();['n','qt','e','loc','m','code'].forEach(i=>$('#'+i).value='');$('#tp').value='outro';
   toast('Guardado!');show('itens');
 }
 
@@ -227,8 +282,9 @@ async function doNotify(){
         if(g.perDay&&w>0.005){const m=`Pode sobrar ~${num(w)} ${g.unit}. Use mais ou doe.`;push(n9,`Dispensa: risco de perder ${g.name}`,m);push(n9b,`Dispensa: risco de perder ${g.name}`,m)}
       });
     });
+    {const d=new Date(rev+'T09:00:00');d.setDate(d.getDate()+180);push(d,'Mochila de emergência: hora de revisar','Confira as validades e o checklist.')}
     if(list.length)await N.schedule({notifications:list});
   }catch(e){}
 }
-render();notify();
+setCfgInputs();render();notify();
 </script></body></html>
