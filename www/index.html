@@ -67,7 +67,7 @@ nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
 </section>
 <section id="s-novo">
   <button class="ghost full" style="margin-top:0" onclick="scan()">Ler código de barras com a câmera</button>
-  <div id="tprow"><label>Tipo</label><select id="tp" onchange="onTipo()"><option value="outro">Outro item</option><option value="agua">Água (conta na autonomia)</option><option value="alimento">Alimento (1 lata, barra ou pacote = 1 un)</option></select></div>
+  <div id="tprow"><label>Tipo</label><select id="tp" onchange="onTipo()"><option value="outro">Outro item</option><option value="agua">Água (conta na autonomia)</option><option value="alimento">Alimento (1 lata, barra ou pacote = 1 un)</option><option value="purif">Purificador de água (litros que trata)</option></select><div class="mut" id="tphint" style="margin-top:4px"></div></div>
   <label>Produto</label><input id="n" onchange="prefill()">
   <div class="row"><div><label>Quantidade</label><input id="qt" type="number" inputmode="decimal" step="any"></div>
   <div class="sm"><label>Unidade</label><select id="u"><option>kg</option><option>g</option><option>L</option><option>ml</option><option>un</option></select></div></div>
@@ -111,12 +111,13 @@ function packAdd(){const n=(prompt('Nome da mochila (ex.: Mochila do Rafael)')||
 function packRename(){const p=P(),n=(prompt('Novo nome da mochila',p.name)||'').trim();if(!n)return;p.name=n;save();show('check')}
 function packDel(){const p=P();if(!confirm('Excluir "'+p.name+'" e todos os itens dela?'))return;items=items.filter(i=>sOf(i)!==p.id);packs=packs.filter(x=>x.id!==p.id);save();goHome()}
 function cover(p=P()){
-  const cfg=p.cfg;let w=0,f=0;
+  const cfg=p.cfg;let w=0,f=0,pu=0;
   items.filter(i=>sOf(i)===p.id&&dleft(i.exp)>=0).forEach(i=>{
     if(i.tp==='agua')w+=i.unit==='L'?i.qty:i.unit==='ml'?i.qty/1000:0;
+    else if(i.tp==='purif')pu+=i.unit==='L'?i.qty:i.unit==='ml'?i.qty/1000:0;
     else if(i.tp==='alimento'&&i.unit==='un')f+=i.qty});
-  const wd=cfg.w>0?w/(cfg.p*cfg.w):Infinity,fd=f/(cfg.p*cfg.f);
-  return{w,f,wd,fd,days:Math.min(wd,fd)};
+  const wd=cfg.w>0?(w+pu)/(cfg.p*cfg.w):Infinity,fd=f/(cfg.p*cfg.f);
+  return{w,f,pu,wd,fd,days:Math.min(wd,fd)};
 }
 function setCfg(){
   const g=id=>{const v=parseFloat(($('#'+id).value||'').replace(',','.'));return v>0?v:null};
@@ -130,19 +131,21 @@ function chkGroupDel(g){if(!confirm('Remover o grupo e todos os itens dele?'))re
 function chkReset(){if(!confirm('Restaurar a lista padrão? Suas alterações na lista serão perdidas.'))return;P().list=JSON.parse(JSON.stringify(CHK0));P().chk={};save();renderCheck()}
 function tick(el){const c=P().chk;if(el.checked)c[el.dataset.t]=1;else delete c[el.dataset.t];save();renderCheck()}
 function conferi(){P().rev=today();save();render();toast('Conferência registrada. Próximo aviso em 6 meses.')}
+function tpHint(){const h={agua:'Conta em litros (L ou ml).',alimento:'1 lata, barra ou pacote = 1 porção (use a unidade un).',purif:'Informe quantos litros este item purifica (veja na embalagem). Ex.: pastilhas que tratam 12 L.'};$('#tphint').textContent=h[$('#tp').value]||''}
 function onTipo(){
+  tpHint();
   const t=$('#tp').value,u=$('#u').value;
   if(t==='alimento'){if(u!=='un')$('#qt').value=1;$('#u').value='un'}
-  else if(t==='agua'&&u!=='L'&&u!=='ml')$('#u').value='L';
+  else if((t==='agua'||t==='purif')&&u!=='L'&&u!=='ml')$('#u').value='L';
 }
 function renderCheck(){
   const p=P(),cfg=p.cfg,chk=p.chk,rev=p.rev,chkList=p.list,v=cover(p),bar=(x,m)=>`<div class="bar"><i style="width:${Math.min(100,x/m*100)}%"></i></div>`;
-  const nw=Math.max(0,cfg.d*cfg.p*cfg.w-v.w),nf=Math.max(0,cfg.d*cfg.p*cfg.f-v.f),ok=nw<0.001&&nf<0.001;
+  const nw=Math.max(0,cfg.d*cfg.p*cfg.w-v.w-v.pu),nf=Math.max(0,cfg.d*cfg.p*cfg.f-v.f),ok=nw<0.001&&nf<0.001;
   $('#cover').innerHTML=`<div class="card ${ok?'':'warn'}"><h3>Autonomia: ${num(v.days)} de ${cfg.d} dias</h3>
-  <div class="mut">Água: ${num(v.w)} L${cfg.w>0?' · '+num(v.wd)+' dia(s)':' (não entra na meta)'}</div>${cfg.w>0?bar(v.wd,cfg.d):''}
+  <div class="mut">Água: ${num(v.w)} L${v.pu?' + '+num(v.pu)+' L purificáveis':''}${cfg.w>0?' · '+num(v.wd)+' dia(s)':' (não entra na meta)'}</div>${cfg.w>0?bar(v.wd,cfg.d):''}
   <div class="mut" style="margin-top:8px">Alimento: ${num(v.f)} porções · ${num(v.fd)} dia(s)</div>${bar(v.fd,cfg.d)}
   <div style="margin-top:8px" class="${ok?'':'warn-t'}">${ok?'Mochila pronta para '+cfg.d+' dias.':'Faltam '+(nw>=0.001?num(nw)+' L de água':'')+(nw>=0.001&&nf>=0.001?' e ':'')+(nf>=0.001?num(nf)+' porções de alimento':'')+'.'}</div>
-  <div class="mut" style="margin-top:6px">Só conta o que está dentro da validade. Cadastre água e alimentos em Adicionar, escolhendo o tipo.</div></div>`;
+  <div class="mut" style="margin-top:6px">Só conta o que está dentro da validade. Cadastre água, alimentos e purificadores em Adicionar, escolhendo o tipo. Litros purificáveis só ajudam se houver água para tratar.</div></div>`;
   let tot=0,done=0,h='';
   chkList.forEach(([t,l],gi)=>{
     h+=`<h2>${esc(t)}${chkEdit?` <button class="mini" onclick="chkAdd(${gi})">+ Item</button> <button class="mini ghost" onclick="chkGroupDel(${gi})">Remover grupo</button>`:''}</h2>`;
@@ -202,7 +205,7 @@ function renderHome(){
 }
 function renderResumo(){
   const a=alerts(sp);let h='';
-  if(a.cov){const cfg=P().cfg,v=cover();h+=`<h2>Autonomia da mochila</h2><div class="card warn"><h3>Cobre ${num(v.days)} de ${cfg.d} dias</h3><div class="mut">Água: ${num(v.w)} L · Alimento: ${num(v.f)} porções. Veja o Checklist para o que falta.</div></div>`}
+  if(a.cov){const cfg=P().cfg,v=cover(),nw=Math.max(0,cfg.d*cfg.p*cfg.w-v.w-v.pu),nf=Math.max(0,cfg.d*cfg.p*cfg.f-v.f),lim=cfg.w>0&&v.wd<v.fd?'água':'alimento';h+=`<h2>Autonomia da mochila</h2><div class="card warn"><h3>Cobre ${num(v.days)} de ${cfg.d} dias</h3><div class="mut">Limitado por ${lim}.${nw>=0.001?' Faltam '+num(nw)+' L de água.':''}${nf>=0.001?' Faltam '+num(nf)+' porções de alimento.':''} Você tem ${num(v.w)} L de água${v.pu?' (+'+num(v.pu)+' L purificáveis)':''} e ${num(v.f)} porções.</div></div>`}
   if(a.rev)h+=`<h2>Revisão</h2><div class="card warn"><h3>Hora de revisar a mochila</h3><div class="mut">Última conferência há ${daysSince(P().rev)} dias. Confira validades e o checklist.</div></div>`;
   if(a.exp.length){h+='<h2>Vencidos</h2>';a.exp.forEach(g=>g.lots.filter(l=>l.d<0).forEach(l=>h+=`<div class="card bad"><h3>${esc(g.name)}</h3><span class="bad-t">${num(l.qty)} ${g.unit} venceu em ${br(l.exp)}</span><div class="mut">${esc(l.loc||'')}</div></div>`))}
   if(a.risk.length){h+='<h2>Risco de perda</h2>';a.risk.forEach(g=>{
@@ -240,14 +243,14 @@ function rate(k){
   const a=prompt(`Consumo por mês de ${g.name} (${g.unit})`,rates[k]?rates[k].m:'');
   if(a===null)return;rates[k]={m:parseFloat(a.replace(',','.'))||0,unit:g.unit};save();render();
 }
-function clearForm(){['n','qt','e','loc','m','code'].forEach(i=>$('#'+i).value='');$('#tp').value='outro';editId=null}
+function clearForm(){['n','qt','e','loc','m','code'].forEach(i=>$('#'+i).value='');$('#tp').value='outro';tpHint();editId=null}
 function newItem(){clearForm();show('novo')}
 function cancelEdit(){clearForm();show('itens')}
 function edit(id){
   const i=items.find(x=>x.id===id);if(!i)return;
   clearForm();editId=id;
   $('#n').value=i.name;$('#qt').value=i.qty;$('#u').value=i.unit;$('#e').value=i.exp;$('#loc').value=i.loc||'';$('#code').value=i.code||'';
-  $('#tp').value=i.tp||'outro';
+  $('#tp').value=i.tp||'outro';tpHint();
   const r=sp==='dispensa'&&rates[key(i.name)];if(r&&r.m)$('#m').value=r.m;
   show('novo');
 }
