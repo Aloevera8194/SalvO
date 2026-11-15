@@ -28,11 +28,18 @@ jobs:
       - run: npx cap sync android
       - name: Assinatura fixa e versao
         run: |
+          test -f debug.keystore
           mkdir -p ~/.android && cp debug.keystore ~/.android/debug.keystore
-          sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          python scripts/patch_gradle.py ${{ github.run_number }}
       - name: Compilar
         working-directory: android
         run: chmod +x gradlew && ./gradlew assembleDebug
+      - name: Conferir assinatura
+        run: |
+          APKSIGNER=$(ls -d $ANDROID_HOME/build-tools/*/apksigner | sort -V | tail -1)
+          OUT=$($APKSIGNER verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk)
+          echo "$OUT"
+          echo "$OUT" | grep -qi 2286e9f262eb9119d1215212ccd8b95371b735b0a6fd4ac411581b758146f789 || { echo "ERRO: APK nao foi assinado com a chave fixa"; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: SalvO-apk
