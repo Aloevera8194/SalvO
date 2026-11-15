@@ -62,6 +62,7 @@ nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
   <div class="row"><div><label>Pessoas</label><input id="cp" type="number" inputmode="decimal" onchange="setCfg()"></div><div><label>Meta (dias)</label><input id="cd" type="number" inputmode="decimal" onchange="setCfg()"></div></div>
   <div class="row"><div><label>Água (L/pessoa/dia)</label><input id="cw" type="number" inputmode="decimal" step="any" onchange="setCfg()"></div><div><label>Porções/pessoa/dia</label><input id="cf" type="number" inputmode="decimal" step="any" onchange="setCfg()"></div></div>
   <p class="mut">Referência da Defesa Civil Nacional: kit para 72 horas (3 dias), com 2 litros de água por pessoa por dia.</p>
+  <div class="acts"><button class="mini ghost" onclick="packRename()">Renomear mochila</button><button class="mini ghost" onclick="packDel()">Excluir mochila</button></div>
   <h2 id="chkh">Checklist</h2><div class="acts" style="margin:0 0 6px"><button class="mini ghost" id="chkbtn" onclick="chkEdit=!chkEdit;renderCheck()">Editar lista</button></div><div id="chk"></div><div id="rv" style="margin-top:14px"></div>
 </section>
 <section id="s-novo">
@@ -88,26 +89,30 @@ nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
 <script>
 const $=s=>document.querySelector(s);
 const L=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
-let items=L('sv_items')||[],rates=L('sv_rates')||{},known=L('sv_known')||{},sp=null,cfg=Object.assign({p:1,d:3,w:2,f:3},L('sv_cfg')||{}),chk=L('sv_chk')||{},editId=null,chkEdit=false;
+let items=L('sv_items')||[],rates=L('sv_rates')||{},known=L('sv_known')||{},sp=null,editId=null,chkEdit=false;
 const sOf=i=>i.space||'dispensa';
-const NAME={dispensa:'Dispensa',mochila:'Mochila de emergência'};
+const isPack=s=>!!s&&s!=='dispensa';
+const P=(id=sp)=>packs.find(p=>p.id===id);
+const nameOf=s=>s==='dispensa'?'Dispensa':(P(s)||{name:'Mochila'}).name;
 const ICON={
  dispensa:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><rect x="9" y="6" width="46" height="52" rx="5"/><path d="M9 23h46M9 40h46"/><rect x="15" y="11" width="9" height="12" fill="currentColor" stroke="none"/><rect x="28" y="14" width="8" height="9" fill="currentColor" stroke="none"/><rect x="18" y="28" width="12" height="12" fill="currentColor" stroke="none"/><rect x="38" y="30" width="9" height="10" fill="currentColor" stroke="none"/></svg>',
  mochila:'<svg viewBox="0 0 64 64"><path d="M24 15c0-6 3-9 8-9s8 3 8 9" fill="none" stroke="currentColor" stroke-width="3.5"/><rect x="8" y="34" width="6" height="16" rx="2" fill="currentColor" opacity=".6"/><rect x="50" y="34" width="6" height="16" rx="2" fill="currentColor" opacity=".6"/><rect x="13" y="13" width="38" height="46" rx="11" fill="currentColor"/><path d="M19 30h26" stroke="#181c1a" stroke-width="2.5"/><rect x="20" y="36" width="24" height="17" rx="5" fill="#181c1a"/></svg>'};
-const save=()=>{localStorage.setItem('sv_items',JSON.stringify(items));localStorage.setItem('sv_rates',JSON.stringify(rates));localStorage.setItem('sv_known',JSON.stringify(known));localStorage.setItem('sv_cfg',JSON.stringify(cfg));localStorage.setItem('sv_chk',JSON.stringify(chk));localStorage.setItem('sv_chklist',JSON.stringify(chkList));notify()};
+const save=()=>{localStorage.setItem('sv_items',JSON.stringify(items));localStorage.setItem('sv_rates',JSON.stringify(rates));localStorage.setItem('sv_known',JSON.stringify(known));localStorage.setItem('sv_packs',JSON.stringify(packs));notify()};
 const key=n=>n.trim().toLowerCase();
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const num=n=>(+n.toFixed(2)).toLocaleString('pt-BR');
 const dleft=d=>{const t=new Date();t.setHours(12,0,0,0);return Math.round((new Date(d+'T12:00:00')-t)/864e5)};
 const br=d=>d.split('-').reverse().join('/');
 const today=()=>{const t=new Date();return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')};
-let rev=localStorage.getItem('sv_rev')||today();localStorage.setItem('sv_rev',rev);
 const daysSince=d=>Math.round((new Date(today()+'T12:00:00')-new Date(d+'T12:00:00'))/864e5);
 const CHK0=[['Equipamentos e ferramentas',['Apito de longo alcance','Canivete multifuncional','Lanterna de dínamo (ou com pilhas extras)','Corda (3 metros / 6 mm)','Isqueiro e velas','Capa de chuva','Garrafa de água (500 ml)','Talheres descartáveis']],['Primeiros socorros e documentos',['Manta térmica aluminizada','Máscaras (KN95 ou descartáveis)','Gaze, ataduras e curativos','Luvas descartáveis','Soro fisiológico (100 ml)','Hipoclorito de sódio (30 ml, para purificar água)','Porta-documentos impermeável (cópias de RG, CPF e certidões)','Porta-remédios (medicações de uso contínuo)']],['Higiene pessoal',['Necessaire','Escova, creme dental e fio dental','Sabonete','Pente e lixa de unha','Absorventes','Repelente','Álcool em gel']]];
-let chkList=L('sv_chklist')||JSON.parse(JSON.stringify(CHK0));
-function cover(){
-  let w=0,f=0;
-  items.filter(i=>sOf(i)==='mochila'&&dleft(i.exp)>=0).forEach(i=>{
+let packs=L('sv_packs')||[{id:'mochila',name:'Mochila de emergência',cfg:Object.assign({p:1,d:3,w:2,f:3},L('sv_cfg')||{}),chk:L('sv_chk')||{},list:L('sv_chklist')||JSON.parse(JSON.stringify(CHK0)),rev:localStorage.getItem('sv_rev')||today()}];
+function packAdd(){const n=(prompt('Nome da mochila (ex.: Mochila do Rafael)')||'').trim();if(!n)return;packs.push({id:'p'+Date.now(),name:n,cfg:{p:1,d:3,w:2,f:3},chk:{},list:JSON.parse(JSON.stringify(CHK0)),rev:today()});save();render();toast('Mochila criada. Toque nela para começar.')}
+function packRename(){const p=P(),n=(prompt('Novo nome da mochila',p.name)||'').trim();if(!n)return;p.name=n;save();show('check')}
+function packDel(){const p=P();if(!confirm('Excluir "'+p.name+'" e todos os itens dela?'))return;items=items.filter(i=>sOf(i)!==p.id);packs=packs.filter(x=>x.id!==p.id);save();goHome()}
+function cover(p=P()){
+  const cfg=p.cfg;let w=0,f=0;
+  items.filter(i=>sOf(i)===p.id&&dleft(i.exp)>=0).forEach(i=>{
     if(i.tp==='agua')w+=i.unit==='L'?i.qty:i.unit==='ml'?i.qty/1000:0;
     else if(i.tp==='alimento'&&i.unit==='un')f+=i.qty});
   const wd=w/(cfg.p*cfg.w),fd=f/(cfg.p*cfg.f);
@@ -115,23 +120,23 @@ function cover(){
 }
 function setCfg(){
   const g=id=>{const v=parseFloat(($('#'+id).value||'').replace(',','.'));return v>0?v:null};
-  cfg={p:g('cp')||cfg.p,d:g('cd')||cfg.d,w:g('cw')||cfg.w,f:g('cf')||cfg.f};save();setCfgInputs();render();
+  const cfg=P().cfg;P().cfg={p:g('cp')||cfg.p,d:g('cd')||cfg.d,w:g('cw')||cfg.w,f:g('cf')||cfg.f};save();setCfgInputs();render();
 }
-function setCfgInputs(){$('#cp').value=cfg.p;$('#cd').value=cfg.d;$('#cw').value=cfg.w;$('#cf').value=cfg.f}
-function chkAdd(g){const t=(prompt('Novo item')||'').trim();if(!t)return;chkList[g][1].push(t);save();renderCheck()}
-function chkDel(g,i){const t=chkList[g][1][i];chkList[g][1].splice(i,1);delete chk[t];save();renderCheck()}
-function chkGroupAdd(){const t=(prompt('Nome do novo grupo')||'').trim();if(!t)return;chkList.push([t,[]]);save();renderCheck()}
-function chkGroupDel(g){if(!confirm('Remover o grupo e todos os itens dele?'))return;chkList[g][1].forEach(t=>delete chk[t]);chkList.splice(g,1);save();renderCheck()}
-function chkReset(){if(!confirm('Restaurar a lista padrão? Suas alterações na lista serão perdidas.'))return;chkList=JSON.parse(JSON.stringify(CHK0));chk={};save();renderCheck()}
-function tick(el){if(el.checked)chk[el.dataset.t]=1;else delete chk[el.dataset.t];save();renderCheck()}
-function conferi(){rev=today();localStorage.setItem('sv_rev',rev);save();render();toast('Conferência registrada. Próximo aviso em 6 meses.')}
+function setCfgInputs(){const cfg=P().cfg;$('#cp').value=cfg.p;$('#cd').value=cfg.d;$('#cw').value=cfg.w;$('#cf').value=cfg.f}
+function chkAdd(g){const t=(prompt('Novo item')||'').trim();if(!t)return;P().list[g][1].push(t);save();renderCheck()}
+function chkDel(g,i){const p=P(),t=p.list[g][1][i];p.list[g][1].splice(i,1);delete p.chk[t];save();renderCheck()}
+function chkGroupAdd(){const t=(prompt('Nome do novo grupo')||'').trim();if(!t)return;P().list.push([t,[]]);save();renderCheck()}
+function chkGroupDel(g){if(!confirm('Remover o grupo e todos os itens dele?'))return;const p=P();p.list[g][1].forEach(t=>delete p.chk[t]);p.list.splice(g,1);save();renderCheck()}
+function chkReset(){if(!confirm('Restaurar a lista padrão? Suas alterações na lista serão perdidas.'))return;P().list=JSON.parse(JSON.stringify(CHK0));P().chk={};save();renderCheck()}
+function tick(el){const c=P().chk;if(el.checked)c[el.dataset.t]=1;else delete c[el.dataset.t];save();renderCheck()}
+function conferi(){P().rev=today();save();render();toast('Conferência registrada. Próximo aviso em 6 meses.')}
 function onTipo(){
   const t=$('#tp').value,u=$('#u').value;
   if(t==='alimento'){if(u!=='un')$('#qt').value=1;$('#u').value='un'}
   else if(t==='agua'&&u!=='L'&&u!=='ml')$('#u').value='L';
 }
 function renderCheck(){
-  const v=cover(),bar=(x,m)=>`<div class="bar"><i style="width:${Math.min(100,x/m*100)}%"></i></div>`;
+  const p=P(),cfg=p.cfg,chk=p.chk,rev=p.rev,chkList=p.list,v=cover(p),bar=(x,m)=>`<div class="bar"><i style="width:${Math.min(100,x/m*100)}%"></i></div>`;
   const nw=Math.max(0,cfg.d*cfg.p*cfg.w-v.w),nf=Math.max(0,cfg.d*cfg.p*cfg.f-v.f),ok=nw<0.001&&nf<0.001;
   $('#cover').innerHTML=`<div class="card ${ok?'':'warn'}"><h3>Autonomia: ${num(v.days)} de ${cfg.d} dias</h3>
   <div class="mut">Água: ${num(v.w)} L · ${num(v.wd)} dia(s)</div>${bar(v.wd,cfg.d)}
@@ -155,11 +160,11 @@ function show(t){
   document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==='s-'+t));
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
   $('nav').style.display=t==='home'?'none':'flex';$('#back').style.display=t==='home'?'none':'block';
-  document.body.className=sp==='mochila'?'m':'';
+  document.body.className=isPack(sp)?'m':'';
   $('#savebtn').textContent=editId?'Salvar alterações':'Guardar';$('#cancelbtn').style.display=editId?'block':'none';
-  $('#ht').textContent=sp?NAME[sp]:'SalvO';$('#hs').textContent=sp?(sp==='mochila'?'Itens para levar em uma emergência':'Seus alimentos e validades'):'Escolha o que organizar';
-  $('#mrow').style.display=sp==='mochila'?'none':'block';$('#tprow').style.display=sp==='mochila'?'block':'none';$('#navchk').style.display=sp==='mochila'?'':'none';
-  $('#loc').placeholder=sp==='mochila'?'Ex.: bolso da frente':'Ex.: Prateleira 2, caixa B';
+  $('#ht').textContent=sp?nameOf(sp):'SalvO';$('#hs').textContent=sp?(isPack(sp)?'Itens para levar em uma emergência':'Seus alimentos e validades'):'Escolha o que organizar';
+  $('#mrow').style.display=isPack(sp)?'none':'block';$('#tprow').style.display=isPack(sp)?'block':'none';$('#navchk').style.display=isPack(sp)?'':'none';if(isPack(sp))setCfgInputs();
+  $('#loc').placeholder=isPack(sp)?'Ex.: bolso da frente':'Ex.: Prateleira 2, caixa B';
   render();
 }
 function openSp(s){sp=s;show('resumo')}
@@ -181,30 +186,30 @@ function groups(s){
   }).sort((a,b)=>a.name.localeCompare(b.name));
 }
 function alerts(s){
-  const gs=groups(s),lim=s==='mochila'?30:7;
+  const gs=groups(s),lim=isPack(s)?30:7;
   return{gs,lim,
     exp:gs.filter(g=>g.lots.some(l=>l.d<0)),
     risk:gs.filter(g=>g.perDay&&g.lots.some(l=>l.d>=0&&l.waste>0.005)),
     soon:gs.filter(g=>!g.perDay&&g.lots.some(l=>l.d>=0&&l.d<=lim)),
-    low:s==='mochila'?[]:gs.filter(g=>g.perDay&&g.left<10),
-    cov:s==='mochila'&&cover().days<cfg.d-0.001,rev:s==='mochila'&&daysSince(rev)>180};
+    low:isPack(s)?[]:gs.filter(g=>g.perDay&&g.left<10),
+    cov:isPack(s)&&cover(P(s)).days<P(s).cfg.d-0.001,rev:isPack(s)&&daysSince(P(s).rev)>180};
 }
 
 function renderHome(){
-  $('#s-home').innerHTML=['dispensa','mochila'].map(s=>{
+  $('#s-home').innerHTML=['dispensa',...packs.map(p=>p.id)].map(s=>{
     const a=alerts(s),c=a.exp.length+a.risk.length+a.soon.length+a.low.length+(a.cov?1:0)+(a.rev?1:0),n=items.filter(i=>sOf(i)===s).length;
-    return `<div class="space ${s[0]}" onclick="openSp('${s}')">${ICON[s]}<div><h3>${NAME[s]}</h3><div>${n} item(ns)${s==='mochila'?' · autonomia '+num(cover().days)+' de '+cfg.d+' dias':''}${c?' · '+c+' alerta(s)':''}</div></div>${c?`<span class="pill">${c}</span>`:''}</div>`}).join('');
+    return `<div class="space ${s==='dispensa'?'d':'m'}" onclick="openSp('${s}')">${ICON[isPack(s)?'mochila':'dispensa']}<div><h3>${esc(nameOf(s))}</h3><div>${n} item(ns)${isPack(s)?' · autonomia '+num(cover(P(s)).days)+' de '+P(s).cfg.d+' dias':''}${c?' · '+c+' alerta(s)':''}</div></div>${c?`<span class="pill">${c}</span>`:''}</div>`}).join('')+'<button class="ghost full" onclick="packAdd()">+ Nova mochila</button>';
 }
 function renderResumo(){
   const a=alerts(sp);let h='';
-  if(a.cov){const v=cover();h+=`<h2>Autonomia da mochila</h2><div class="card warn"><h3>Cobre ${num(v.days)} de ${cfg.d} dias</h3><div class="mut">Água: ${num(v.w)} L · Alimento: ${num(v.f)} porções. Veja o Checklist para o que falta.</div></div>`}
-  if(a.rev)h+=`<h2>Revisão</h2><div class="card warn"><h3>Hora de revisar a mochila</h3><div class="mut">Última conferência há ${daysSince(rev)} dias. Confira validades e o checklist.</div></div>`;
+  if(a.cov){const cfg=P().cfg,v=cover();h+=`<h2>Autonomia da mochila</h2><div class="card warn"><h3>Cobre ${num(v.days)} de ${cfg.d} dias</h3><div class="mut">Água: ${num(v.w)} L · Alimento: ${num(v.f)} porções. Veja o Checklist para o que falta.</div></div>`}
+  if(a.rev)h+=`<h2>Revisão</h2><div class="card warn"><h3>Hora de revisar a mochila</h3><div class="mut">Última conferência há ${daysSince(P().rev)} dias. Confira validades e o checklist.</div></div>`;
   if(a.exp.length){h+='<h2>Vencidos</h2>';a.exp.forEach(g=>g.lots.filter(l=>l.d<0).forEach(l=>h+=`<div class="card bad"><h3>${esc(g.name)}</h3><span class="bad-t">${num(l.qty)} ${g.unit} venceu em ${br(l.exp)}</span><div class="mut">${esc(l.loc||'')}</div></div>`))}
   if(a.risk.length){h+='<h2>Risco de perda</h2>';a.risk.forEach(g=>{
     const w=g.lots.filter(l=>l.d>=0).reduce((s,l)=>s+l.waste,0),f=g.lots.find(l=>l.d>=0&&l.waste>0.005);
     h+=`<div class="card warn"><h3>${esc(g.name)}</h3><span class="warn-t">Pode sobrar ~${num(w)} ${g.unit}</span><div class="mut">Você tem ${num(g.total)} ${g.unit}, usa ${num(rates[g.k].m)}/mês. Lote de ${br(f.exp)} vence em ${f.d} dia(s). Use mais ou doe.</div></div>`})}
   if(a.soon.length){h+='<h2>Vencem em breve</h2>';a.soon.forEach(g=>{const l=g.lots.find(l=>l.d>=0&&l.d<=a.lim);
-    h+=`<div class="card warn"><h3>${esc(g.name)}</h3><span class="warn-t">Vence em ${l.d} dia(s)</span><div class="mut">${num(l.qty)} ${g.unit}${l.loc?' · '+esc(l.loc):''}. ${sp==='mochila'?'Troque por um item novo.':'Informe o consumo mensal para um alerta melhor.'}</div></div>`})}
+    h+=`<div class="card warn"><h3>${esc(g.name)}</h3><span class="warn-t">Vence em ${l.d} dia(s)</span><div class="mut">${num(l.qty)} ${g.unit}${l.loc?' · '+esc(l.loc):''}. ${isPack(sp)?'Troque por um item novo.':'Informe o consumo mensal para um alerta melhor.'}</div></div>`})}
   if(a.low.length){h+='<h2>Reposição</h2>';a.low.forEach(g=>h+=`<div class="card"><h3>${esc(g.name)}</h3><span>Estoque dura ~${Math.max(1,Math.floor(g.left))} dia(s)</span><div class="mut">Restam ${num(g.total)} ${g.unit}.</div></div>`)}
   if(!h)h=a.gs.length?'<div class="empty">Tudo certo por aqui. Nenhum alerta no momento.</div>':'<div class="empty">Nada cadastrado ainda.<br>Toque em Adicionar para começar.</div>';
   $('#s-resumo').innerHTML=h;
@@ -220,7 +225,7 @@ function renderItens(){
   });
   $('#lista').innerHTML=h||'<div class="empty">Nada encontrado.</div>';
 }
-function render(){if(!sp)renderHome();else{renderResumo();renderItens();if(sp==='mochila')renderCheck()}}
+function render(){if(!sp)renderHome();else{renderResumo();renderItens();if(isPack(sp))renderCheck()}}
 
 function use(k){
   const g=groups(sp).find(x=>x.k===k);if(!g)return;
@@ -253,7 +258,7 @@ function add(){
   const name=$('#n').value.trim(),qty=parseFloat($('#qt').value),exp=$('#e').value;
   if(!name||!(qty>0)||!exp)return toast('Preencha produto, quantidade e validade.');
   const u=$('#u').value,code=$('#code').value;
-  const tp=sp==='mochila'?$('#tp').value:undefined,loc=$('#loc').value.trim(),cur=editId&&items.find(x=>x.id===editId);
+  const tp=isPack(sp)?$('#tp').value:undefined,loc=$('#loc').value.trim(),cur=editId&&items.find(x=>x.id===editId);
   if(cur)Object.assign(cur,{tp,name,qty,unit:u,exp,loc,code:code||cur.code});
   else items.push({id:Date.now(),space:sp,tp,name,qty,unit:u,exp,loc,code});
   const m=parseFloat($('#m').value);
@@ -298,8 +303,8 @@ async function doNotify(){
     const push=(date,title,body)=>{if(date.getTime()>now&&list.length<300)list.push({id:id++,title,body,schedule:{at:date,allowWhileIdle:true}})};
     const n9=new Date();n9.setHours(9,0,0,0);if(n9.getTime()<=now)n9.setDate(n9.getDate()+1);
     const n9b=new Date(n9);n9b.setDate(n9b.getDate()+3);
-    ['dispensa','mochila'].forEach(s=>{
-      const offs=s==='mochila'?[30,7,0]:[7,3,1,0],tt=s==='mochila'?'Mochila de emergência':'Dispensa';
+    ['dispensa',...packs.map(p=>p.id)].forEach(s=>{
+      const offs=isPack(s)?[30,7,0]:[7,3,1,0],tt=nameOf(s);
       groups(s).forEach(g=>{
         g.lots.forEach(l=>{
           const info=`${num(l.qty)} ${l.unit}${l.loc?' · '+l.loc:''}`;
@@ -310,9 +315,9 @@ async function doNotify(){
         if(g.perDay&&w>0.005){const m=`Pode sobrar ~${num(w)} ${g.unit}. Use mais ou doe.`;push(n9,`Dispensa: risco de perder ${g.name}`,m);push(n9b,`Dispensa: risco de perder ${g.name}`,m)}
       });
     });
-    {const d=new Date(rev+'T09:00:00');d.setDate(d.getDate()+180);push(d,'Mochila de emergência: hora de revisar','Confira as validades e o checklist.')}
+    packs.forEach(p=>{const d=new Date(p.rev+'T09:00:00');d.setDate(d.getDate()+180);push(d,p.name+': hora de revisar','Confira as validades e o checklist.')});
     if(list.length)await N.schedule({notifications:list});
   }catch(e){}
 }
-setCfgInputs();render();notify();
+render();notify();
 </script></body></html>
