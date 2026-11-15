@@ -1,0 +1,6 @@
+{
+  "appId": "com.aloevera.salvo",
+  "appName": "SalvO",
+  "webDir": "www",
+  "server": { "androidScheme": "https" }
+}
