@@ -3,19 +3,29 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>SalvO</title>
 <style>
-:root{--bg:#f1f3ee;--ink:#16221d;--mut:#66736c;--pine:#1f4a3d;--card:#fff;--line:#d9ded6;--ok:#2f7d5b;--warn:#b57a00;--bad:#c0392b}
+:root{--bg:#f1f3ee;--ink:#16221d;--mut:#66736c;--pine:#1f4a3d;--yel:#f2b705;--card:#fff;--line:#d9ded6;--ok:#2f7d5b;--warn:#b57a00;--bad:#c0392b}
+body.m{--pine:#2b312e}
 *{box-sizing:border-box}
 body{margin:0;font:16px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:84px}
-header{background:var(--pine);color:#fff;padding:18px 16px 14px}
+header{background:var(--pine);color:#fff;padding:18px 16px 14px;display:flex;align-items:center;gap:10px}
+body.m header{background:#181c1a}body.m header h1{color:var(--yel)}
 header h1{margin:0;font-size:22px;letter-spacing:.5px}
 header p{margin:2px 0 0;font-size:13px;opacity:.75}
+#back{display:none;background:rgba(255,255,255,.15);padding:6px 12px;font-size:22px;line-height:1}
 main{padding:14px}
 section{display:none}section.on{display:block}
+.space{display:flex;align-items:center;gap:16px;padding:20px;border-radius:14px;margin-bottom:14px;position:relative}
+.space svg{width:60px;height:60px;flex:none}
+.space h3{margin:0;font-size:19px}
+.space.d{background:var(--pine);color:#fff}
+.space.m{background:#181c1a;color:var(--yel)}
+.space.m div div{color:#d9d9d9;font-size:14px}.space.d div div{color:#d4e2dc;font-size:14px}
+.pill{position:absolute;top:-8px;right:-4px;background:var(--bad);color:#fff;min-width:28px;height:28px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;padding:0 8px;border:2px solid var(--bg)}
 .card{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--ok);border-radius:10px;padding:12px;margin-bottom:10px}
 .card.bad{border-left-color:var(--bad)}.card.warn{border-left-color:var(--warn)}
 .card h3{margin:0 0 4px;font-size:16px}
 .mut{color:var(--mut);font-size:14px}
-.bad-t{color:var(--bad)}.warn-t{color:var(--warn)}.ok-t{color:var(--ok)}
+.bad-t{color:var(--bad)}.warn-t{color:var(--warn)}
 h2{font-size:15px;margin:18px 0 8px;color:var(--pine)}
 label{display:block;font-size:14px;color:var(--mut);margin:12px 0 4px}
 input,select{width:100%;padding:12px;font:inherit;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
@@ -26,17 +36,18 @@ button.mini{padding:6px 10px;font-size:14px}
 button.full{width:100%;margin-top:16px}
 .lot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:14px}
 .acts{display:flex;gap:6px;margin-top:8px}
-nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav{position:fixed;bottom:0;left:0;right:0;display:none;background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
 nav button{flex:1;background:none;color:var(--mut);border-radius:0;padding:14px 4px}
 nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
 #toast{position:fixed;left:16px;right:16px;bottom:96px;background:#16221d;color:#fff;padding:12px;border-radius:8px;display:none;text-align:center}
 .empty{text-align:center;color:var(--mut);padding:30px 10px}
 </style></head><body>
-<header><h1>SalvO</h1><p>Sua dispensa, sem desperdício</p></header>
+<header><button id="back" onclick="goHome()">‹</button><div><h1 id="ht">SalvO</h1><p id="hs">Escolha o que organizar</p></div></header>
 <main>
-<section id="s-resumo" class="on"></section>
-<section id="s-dispensa">
-  <input id="q" placeholder="Buscar produto ou local (ex.: feijão, prateleira 2)" oninput="renderDispensa()">
+<section id="s-home" class="on"></section>
+<section id="s-resumo"></section>
+<section id="s-itens">
+  <input id="q" placeholder="Buscar produto ou local" oninput="renderItens()">
   <div id="lista" style="margin-top:12px"></div>
 </section>
 <section id="s-novo">
@@ -45,36 +56,53 @@ nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
   <div class="row"><div><label>Quantidade</label><input id="qt" type="number" inputmode="decimal" step="any"></div>
   <div class="sm"><label>Unidade</label><select id="u"><option>kg</option><option>g</option><option>L</option><option>ml</option><option>un</option></select></div></div>
   <label>Validade</label><input id="e" type="date">
-  <label>Local (prateleira, caixa...)</label><input id="loc" placeholder="Ex.: Prateleira 2, caixa B">
-  <label>Consumo por mês (na mesma unidade)</label><input id="m" type="number" inputmode="decimal" step="any" placeholder="Ex.: 3">
+  <label>Local (prateleira, bolso, caixa...)</label><input id="loc" placeholder="Ex.: Prateleira 2, caixa B">
+  <div id="mrow"><label>Consumo por mês (na mesma unidade)</label><input id="m" type="number" inputmode="decimal" step="any" placeholder="Ex.: 3"></div>
   <input id="code" type="hidden">
-  <button class="full" onclick="add()">Guardar na dispensa</button>
+  <button class="full" onclick="add()">Guardar</button>
 </section>
 </main>
 <div id="toast"></div>
 <nav>
-  <button class="on" data-t="resumo" onclick="show('resumo')">Alertas</button>
-  <button data-t="dispensa" onclick="show('dispensa')">Dispensa</button>
+  <button data-t="resumo" onclick="show('resumo')">Alertas</button>
+  <button data-t="itens" onclick="show('itens')">Itens</button>
   <button data-t="novo" onclick="show('novo')">Adicionar</button>
 </nav>
 <script>
 const $=s=>document.querySelector(s);
 const L=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
-let items=L('sv_items')||[],rates=L('sv_rates')||{},known=L('sv_known')||{};
-const save=()=>{localStorage.setItem('sv_items',JSON.stringify(items));localStorage.setItem('sv_rates',JSON.stringify(rates));localStorage.setItem('sv_known',JSON.stringify(known))};
+let items=L('sv_items')||[],rates=L('sv_rates')||{},known=L('sv_known')||{},sp=null;
+const sOf=i=>i.space||'dispensa';
+const NAME={dispensa:'Dispensa',mochila:'Mochila de emergência'};
+const ICON={
+ dispensa:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><rect x="9" y="6" width="46" height="52" rx="5"/><path d="M9 23h46M9 40h46"/><rect x="15" y="11" width="9" height="12" fill="currentColor" stroke="none"/><rect x="28" y="14" width="8" height="9" fill="currentColor" stroke="none"/><rect x="18" y="28" width="12" height="12" fill="currentColor" stroke="none"/><rect x="38" y="30" width="9" height="10" fill="currentColor" stroke="none"/></svg>',
+ mochila:'<svg viewBox="0 0 64 64"><path d="M24 15c0-6 3-9 8-9s8 3 8 9" fill="none" stroke="currentColor" stroke-width="3.5"/><rect x="8" y="34" width="6" height="16" rx="2" fill="currentColor" opacity=".6"/><rect x="50" y="34" width="6" height="16" rx="2" fill="currentColor" opacity=".6"/><rect x="13" y="13" width="38" height="46" rx="11" fill="currentColor"/><path d="M19 30h26" stroke="#181c1a" stroke-width="2.5"/><rect x="20" y="36" width="24" height="17" rx="5" fill="#181c1a"/></svg>'};
+const save=()=>{localStorage.setItem('sv_items',JSON.stringify(items));localStorage.setItem('sv_rates',JSON.stringify(rates));localStorage.setItem('sv_known',JSON.stringify(known));notify()};
 const key=n=>n.trim().toLowerCase();
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const num=n=>(+n.toFixed(2)).toLocaleString('pt-BR');
 const dleft=d=>{const t=new Date();t.setHours(12,0,0,0);return Math.round((new Date(d+'T12:00:00')-t)/864e5)};
 const br=d=>d.split('-').reverse().join('/');
 function toast(t){const el=$('#toast');el.textContent=t;el.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>el.style.display='none',3500)}
-function show(t){document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==='s-'+t));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));render()}
 
-function groups(){
-  const g={};items.forEach(i=>{(g[key(i.name)]??=[]).push(i)});
+function show(t){
+  document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==='s-'+t));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  $('nav').style.display=t==='home'?'none':'flex';$('#back').style.display=t==='home'?'none':'block';
+  document.body.className=sp==='mochila'?'m':'';
+  $('#ht').textContent=sp?NAME[sp]:'SalvO';$('#hs').textContent=sp?(sp==='mochila'?'Itens para levar em uma emergência':'Seus alimentos e validades'):'Escolha o que organizar';
+  $('#mrow').style.display=sp==='mochila'?'none':'block';
+  $('#loc').placeholder=sp==='mochila'?'Ex.: bolso da frente':'Ex.: Prateleira 2, caixa B';
+  render();
+}
+function openSp(s){sp=s;show('resumo')}
+function goHome(){sp=null;show('home')}
+
+function groups(s){
+  const g={};items.filter(i=>sOf(i)===s).forEach(i=>{(g[key(i.name)]??=[]).push(i)});
   return Object.entries(g).map(([k,lots])=>{
     lots.sort((a,b)=>a.exp.localeCompare(b.exp));
-    const r=rates[k],perDay=r&&r.m>0?r.m/30:0;
+    const r=s==='dispensa'?rates[k]:null,perDay=r&&r.m>0?r.m/30:0;
     let prev=0,waste=0,total=0;
     lots.forEach(l=>{
       const d=dleft(l.exp);l.d=d;
@@ -82,41 +110,50 @@ function groups(){
       l.waste=perDay?l.qty-eaten:(d<0?l.qty:0);
       if(d>=0)prev+=l.qty;total+=l.qty;waste+=l.waste;
     });
-    return{k,name:lots[0].name,unit:lots[0].unit,lots,total,waste,perDay,left:perDay?total/perDay:null,first:lots[0].d};
+    return{k,name:lots[0].name,unit:lots[0].unit,lots,total,waste,perDay,left:perDay?total/perDay:null};
   }).sort((a,b)=>a.name.localeCompare(b.name));
 }
-
-function renderResumo(){
-  const gs=groups();let h='';
-  const exp=gs.filter(g=>g.lots.some(l=>l.d<0));
-  const risk=gs.filter(g=>g.perDay&&g.lots.some(l=>l.d>=0&&l.waste>0.005));
-  const soon=gs.filter(g=>!g.perDay&&g.first>=0&&g.first<=7);
-  const low=gs.filter(g=>g.perDay&&g.left<10);
-  if(exp.length){h+='<h2>Vencidos</h2>';exp.forEach(g=>g.lots.filter(l=>l.d<0).forEach(l=>h+=`<div class="card bad"><h3>${esc(g.name)}</h3><span class="bad-t">${num(l.qty)} ${g.unit} venceu em ${br(l.exp)}</span><div class="mut">${esc(l.loc||'')}</div></div>`))}
-  if(risk.length){h+='<h2>Risco de perda</h2>';risk.forEach(g=>{
-    const w=g.lots.filter(l=>l.d>=0).reduce((s,l)=>s+l.waste,0);
-    const f=g.lots.find(l=>l.d>=0&&l.waste>0.005);
-    h+=`<div class="card warn"><h3>${esc(g.name)}</h3><span class="warn-t">Pode sobrar ~${num(w)} ${g.unit}</span><div class="mut">Você tem ${num(g.total)} ${g.unit}, usa ${num(rates[g.k].m)}/mês. Lote de ${br(f.exp)} vence em ${f.d} dia(s). Use mais ou doe.</div></div>`})}
-  if(soon.length){h+='<h2>Vencem em breve</h2>';soon.forEach(g=>h+=`<div class="card warn"><h3>${esc(g.name)}</h3><span class="warn-t">Vence em ${g.first} dia(s)</span><div class="mut">${num(g.total)} ${g.unit}. Informe o consumo mensal para um alerta melhor.</div></div>`)}
-  if(low.length){h+='<h2>Reposição</h2>';low.forEach(g=>h+=`<div class="card"><h3>${esc(g.name)}</h3><span>Estoque dura ~${Math.max(1,Math.floor(g.left))} dia(s)</span><div class="mut">Restam ${num(g.total)} ${g.unit}.</div></div>`)}
-  if(!h)h=items.length?'<div class="empty">Tudo certo por aqui. Nenhum alerta no momento.</div>':'<div class="empty">Dispensa vazia.<br>Toque em Adicionar para cadastrar o primeiro produto.</div>';
-  $('#s-resumo').innerHTML=h;
+function alerts(s){
+  const gs=groups(s),lim=s==='mochila'?30:7;
+  return{gs,lim,
+    exp:gs.filter(g=>g.lots.some(l=>l.d<0)),
+    risk:gs.filter(g=>g.perDay&&g.lots.some(l=>l.d>=0&&l.waste>0.005)),
+    soon:gs.filter(g=>!g.perDay&&g.lots.some(l=>l.d>=0&&l.d<=lim)),
+    low:s==='mochila'?[]:gs.filter(g=>g.perDay&&g.left<10)};
 }
 
-function renderDispensa(){
+function renderHome(){
+  $('#s-home').innerHTML=['dispensa','mochila'].map(s=>{
+    const a=alerts(s),c=a.exp.length+a.risk.length+a.soon.length+a.low.length,n=items.filter(i=>sOf(i)===s).length;
+    return `<div class="space ${s[0]}" onclick="openSp('${s}')">${ICON[s]}<div><h3>${NAME[s]}</h3><div>${n} item(ns)${c?' · '+c+' alerta(s)':''}</div></div>${c?`<span class="pill">${c}</span>`:''}</div>`}).join('');
+}
+function renderResumo(){
+  const a=alerts(sp);let h='';
+  if(a.exp.length){h+='<h2>Vencidos</h2>';a.exp.forEach(g=>g.lots.filter(l=>l.d<0).forEach(l=>h+=`<div class="card bad"><h3>${esc(g.name)}</h3><span class="bad-t">${num(l.qty)} ${g.unit} venceu em ${br(l.exp)}</span><div class="mut">${esc(l.loc||'')}</div></div>`))}
+  if(a.risk.length){h+='<h2>Risco de perda</h2>';a.risk.forEach(g=>{
+    const w=g.lots.filter(l=>l.d>=0).reduce((s,l)=>s+l.waste,0),f=g.lots.find(l=>l.d>=0&&l.waste>0.005);
+    h+=`<div class="card warn"><h3>${esc(g.name)}</h3><span class="warn-t">Pode sobrar ~${num(w)} ${g.unit}</span><div class="mut">Você tem ${num(g.total)} ${g.unit}, usa ${num(rates[g.k].m)}/mês. Lote de ${br(f.exp)} vence em ${f.d} dia(s). Use mais ou doe.</div></div>`})}
+  if(a.soon.length){h+='<h2>Vencem em breve</h2>';a.soon.forEach(g=>{const l=g.lots.find(l=>l.d>=0&&l.d<=a.lim);
+    h+=`<div class="card warn"><h3>${esc(g.name)}</h3><span class="warn-t">Vence em ${l.d} dia(s)</span><div class="mut">${num(l.qty)} ${g.unit}${l.loc?' · '+esc(l.loc):''}. ${sp==='mochila'?'Troque por um item novo.':'Informe o consumo mensal para um alerta melhor.'}</div></div>`})}
+  if(a.low.length){h+='<h2>Reposição</h2>';a.low.forEach(g=>h+=`<div class="card"><h3>${esc(g.name)}</h3><span>Estoque dura ~${Math.max(1,Math.floor(g.left))} dia(s)</span><div class="mut">Restam ${num(g.total)} ${g.unit}.</div></div>`)}
+  if(!h)h=a.gs.length?'<div class="empty">Tudo certo por aqui. Nenhum alerta no momento.</div>':'<div class="empty">Nada cadastrado ainda.<br>Toque em Adicionar para começar.</div>';
+  $('#s-resumo').innerHTML=h;
+}
+function renderItens(){
+  if(!sp)return;
   const q=($('#q').value||'').toLowerCase();let h='';
-  groups().filter(g=>!q||g.k.includes(q)||g.lots.some(l=>(l.loc||'').toLowerCase().includes(q))).forEach(g=>{
-    const r=rates[g.k];
-    h+=`<div class="card ${g.lots.some(l=>l.d<0)?'bad':g.waste>0.005?'warn':''}"><h3>${esc(g.name)} · ${num(g.total)} ${g.unit}</h3><div class="mut">${r&&r.m?'Consumo: '+num(r.m)+' '+g.unit+'/mês':'Sem consumo informado'}</div>`;
+  groups(sp).filter(g=>!q||g.k.includes(q)||g.lots.some(l=>(l.loc||'').toLowerCase().includes(q))).forEach(g=>{
+    const r=sp==='dispensa'?rates[g.k]:null;
+    h+=`<div class="card ${g.lots.some(l=>l.d<0)?'bad':g.waste>0.005?'warn':''}"><h3>${esc(g.name)} · ${num(g.total)} ${g.unit}</h3>${sp==='dispensa'?`<div class="mut">${r&&r.m?'Consumo: '+num(r.m)+' '+g.unit+'/mês':'Sem consumo informado'}</div>`:''}`;
     g.lots.forEach(l=>h+=`<div class="lot"><span><b>${esc(l.loc||'Sem local')}</b><br>${num(l.qty)} ${l.unit} · vence ${br(l.exp)} <span class="${l.d<0?'bad-t':l.d<=7?'warn-t':'mut'}">(${l.d<0?'vencido':l.d+' d'})</span></span><button class="mini ghost" onclick="del(${l.id})">Remover</button></div>`);
-    h+=`<div class="acts"><button class="mini" onclick="use('${esc(g.k).replace(/'/g,"\\'")}')">Usei</button><button class="mini ghost" onclick="rate('${esc(g.k).replace(/'/g,"\\'")}')">Consumo</button></div></div>`;
+    h+=`<div class="acts"><button class="mini" data-k="${esc(g.k)}" onclick="use(this.dataset.k)">Usei</button>${sp==='dispensa'?`<button class="mini ghost" data-k="${esc(g.k)}" onclick="rate(this.dataset.k)">Consumo</button>`:''}</div></div>`;
   });
   $('#lista').innerHTML=h||'<div class="empty">Nada encontrado.</div>';
 }
-function render(){renderResumo();renderDispensa()}
+function render(){if(!sp)renderHome();else{renderResumo();renderItens()}}
 
 function use(k){
-  const g=groups().find(x=>x.k===k);if(!g)return;
+  const g=groups(sp).find(x=>x.k===k);if(!g)return;
   const a=parseFloat((prompt(`Quanto você usou? (${g.unit})`,'')||'').replace(',','.'));
   if(!(a>0))return;
   let rest=a;
@@ -124,23 +161,23 @@ function use(k){
   items=items.filter(i=>i.qty>0.0001);save();render();toast('Baixa registrada (o lote que vence primeiro sai primeiro)');
 }
 function rate(k){
-  const g=groups().find(x=>x.k===k);
+  const g=groups(sp).find(x=>x.k===k);
   const a=prompt(`Consumo por mês de ${g.name} (${g.unit})`,rates[k]?rates[k].m:'');
   if(a===null)return;rates[k]={m:parseFloat(a.replace(',','.'))||0,unit:g.unit};save();render();
 }
 function del(id){if(confirm('Remover este lote?')){items=items.filter(i=>i.id!==id);save();render()}}
 
-function prefill(){const r=rates[key($('#n').value)];if(r){$('#u').value=r.unit;if(r.m)$('#m').value=r.m}}
+function prefill(){const r=sp==='dispensa'&&rates[key($('#n').value)];if(r){$('#u').value=r.unit;if(r.m)$('#m').value=r.m}}
 function add(){
   const name=$('#n').value.trim(),qty=parseFloat($('#qt').value),exp=$('#e').value;
   if(!name||!(qty>0)||!exp)return toast('Preencha produto, quantidade e validade.');
   const u=$('#u').value,code=$('#code').value;
-  items.push({id:Date.now(),name,qty,unit:u,exp,loc:$('#loc').value.trim(),code});
+  items.push({id:Date.now(),space:sp,name,qty,unit:u,exp,loc:$('#loc').value.trim(),code});
   const m=parseFloat($('#m').value);
-  if(m>=0&&$('#m').value!=='')rates[key(name)]={m,unit:u};
+  if(sp==='dispensa'&&m>=0&&$('#m').value!=='')rates[key(name)]={m,unit:u};
   if(code)known[code]={name,unit:u};
   save();['n','qt','e','loc','m','code'].forEach(i=>$('#'+i).value='');
-  toast('Guardado!');show('dispensa');
+  toast('Guardado!');show('itens');
 }
 
 async function scan(){
@@ -164,5 +201,34 @@ async function scan(){
     }else toast('Produto não encontrado. Digite o nome uma vez e o app lembra.');
   }catch(e){toast('Não foi possível ler: '+(e.message||e))}
 }
-render();
+
+/* Notificações: reagendadas a cada alteração e ao abrir o app */
+function notify(){clearTimeout(notify.t);notify.t=setTimeout(doNotify,800)}
+async function doNotify(){
+  const N=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.LocalNotifications;if(!N)return;
+  try{
+    let p=await N.checkPermissions();
+    if(p.display!=='granted'){p=await N.requestPermissions();if(p.display!=='granted')return}
+    const pend=await N.getPending();
+    if(pend.notifications.length)await N.cancel({notifications:pend.notifications.map(n=>({id:n.id}))});
+    const now=Date.now(),list=[];let id=1;
+    const push=(date,title,body)=>{if(date.getTime()>now&&list.length<300)list.push({id:id++,title,body,schedule:{at:date,allowWhileIdle:true}})};
+    const n9=new Date();n9.setHours(9,0,0,0);if(n9.getTime()<=now)n9.setDate(n9.getDate()+1);
+    const n9b=new Date(n9);n9b.setDate(n9b.getDate()+3);
+    ['dispensa','mochila'].forEach(s=>{
+      const offs=s==='mochila'?[30,7,0]:[7,3,1,0],tt=s==='mochila'?'Mochila de emergência':'Dispensa';
+      groups(s).forEach(g=>{
+        g.lots.forEach(l=>{
+          const info=`${num(l.qty)} ${l.unit}${l.loc?' · '+l.loc:''}`;
+          if(l.d<0)push(n9,`${tt}: ${g.name} venceu`,info);
+          else offs.forEach(o=>{const d=new Date(l.exp+'T09:00:00');d.setDate(d.getDate()-o);push(d,`${tt}: ${g.name} ${o?'vence em '+o+' dia(s)':'vence hoje'}`,info)});
+        });
+        const w=g.lots.filter(l=>l.d>=0).reduce((a,l)=>a+l.waste,0);
+        if(g.perDay&&w>0.005){const m=`Pode sobrar ~${num(w)} ${g.unit}. Use mais ou doe.`;push(n9,`Dispensa: risco de perder ${g.name}`,m);push(n9b,`Dispensa: risco de perder ${g.name}`,m)}
+      });
+    });
+    if(list.length)await N.schedule({notifications:list});
+  }catch(e){}
+}
+render();notify();
 </script></body></html>
