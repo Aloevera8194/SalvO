@@ -44,6 +44,7 @@ nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
 .bar{height:8px;background:#e4e9e1;border-radius:4px;overflow:hidden;margin-top:4px}
 .bar i{display:block;height:100%;background:var(--ok)}
 .ck{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px dashed var(--line);font-size:15px}
+.ck span{flex:1}
 .ck input{width:22px;height:22px;flex:none;padding:0}
 .ck:has(input:checked) span{color:var(--mut);text-decoration:line-through}
 </style></head><body>
@@ -61,7 +62,7 @@ nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
   <div class="row"><div><label>Pessoas</label><input id="cp" type="number" inputmode="decimal" onchange="setCfg()"></div><div><label>Meta (dias)</label><input id="cd" type="number" inputmode="decimal" onchange="setCfg()"></div></div>
   <div class="row"><div><label>Água (L/pessoa/dia)</label><input id="cw" type="number" inputmode="decimal" step="any" onchange="setCfg()"></div><div><label>Porções/pessoa/dia</label><input id="cf" type="number" inputmode="decimal" step="any" onchange="setCfg()"></div></div>
   <p class="mut">Referência da Defesa Civil Nacional: kit para 72 horas (3 dias), com 2 litros de água por pessoa por dia.</p>
-  <h2 id="chkh">Checklist</h2><div id="chk"></div><div id="rv" style="margin-top:14px"></div>
+  <h2 id="chkh">Checklist</h2><div class="acts" style="margin:0 0 6px"><button class="mini ghost" id="chkbtn" onclick="chkEdit=!chkEdit;renderCheck()">Editar lista</button></div><div id="chk"></div><div id="rv" style="margin-top:14px"></div>
 </section>
 <section id="s-novo">
   <button class="ghost full" style="margin-top:0" onclick="scan()">Ler código de barras com a câmera</button>
@@ -73,7 +74,8 @@ nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
   <label>Local (prateleira, bolso, caixa...)</label><input id="loc" placeholder="Ex.: Prateleira 2, caixa B">
   <div id="mrow"><label>Consumo por mês (na mesma unidade)</label><input id="m" type="number" inputmode="decimal" step="any" placeholder="Ex.: 3"></div>
   <input id="code" type="hidden">
-  <button class="full" onclick="add()">Guardar</button>
+  <button class="full" id="savebtn" onclick="add()">Guardar</button>
+  <button class="full ghost" id="cancelbtn" style="display:none;margin-top:8px" onclick="cancelEdit()">Cancelar edição</button>
 </section>
 </main>
 <div id="toast"></div>
@@ -81,18 +83,18 @@ nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
   <button data-t="resumo" onclick="show('resumo')">Alertas</button>
   <button data-t="itens" onclick="show('itens')">Itens</button>
   <button data-t="check" id="navchk" onclick="show('check')">Checklist</button>
-  <button data-t="novo" onclick="show('novo')">Adicionar</button>
+  <button data-t="novo" onclick="newItem()">Adicionar</button>
 </nav>
 <script>
 const $=s=>document.querySelector(s);
 const L=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
-let items=L('sv_items')||[],rates=L('sv_rates')||{},known=L('sv_known')||{},sp=null,cfg=Object.assign({p:1,d:3,w:2,f:3},L('sv_cfg')||{}),chk=L('sv_chk')||{};
+let items=L('sv_items')||[],rates=L('sv_rates')||{},known=L('sv_known')||{},sp=null,cfg=Object.assign({p:1,d:3,w:2,f:3},L('sv_cfg')||{}),chk=L('sv_chk')||{},editId=null,chkEdit=false;
 const sOf=i=>i.space||'dispensa';
 const NAME={dispensa:'Dispensa',mochila:'Mochila de emergência'};
 const ICON={
  dispensa:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><rect x="9" y="6" width="46" height="52" rx="5"/><path d="M9 23h46M9 40h46"/><rect x="15" y="11" width="9" height="12" fill="currentColor" stroke="none"/><rect x="28" y="14" width="8" height="9" fill="currentColor" stroke="none"/><rect x="18" y="28" width="12" height="12" fill="currentColor" stroke="none"/><rect x="38" y="30" width="9" height="10" fill="currentColor" stroke="none"/></svg>',
  mochila:'<svg viewBox="0 0 64 64"><path d="M24 15c0-6 3-9 8-9s8 3 8 9" fill="none" stroke="currentColor" stroke-width="3.5"/><rect x="8" y="34" width="6" height="16" rx="2" fill="currentColor" opacity=".6"/><rect x="50" y="34" width="6" height="16" rx="2" fill="currentColor" opacity=".6"/><rect x="13" y="13" width="38" height="46" rx="11" fill="currentColor"/><path d="M19 30h26" stroke="#181c1a" stroke-width="2.5"/><rect x="20" y="36" width="24" height="17" rx="5" fill="#181c1a"/></svg>'};
-const save=()=>{localStorage.setItem('sv_items',JSON.stringify(items));localStorage.setItem('sv_rates',JSON.stringify(rates));localStorage.setItem('sv_known',JSON.stringify(known));localStorage.setItem('sv_cfg',JSON.stringify(cfg));localStorage.setItem('sv_chk',JSON.stringify(chk));notify()};
+const save=()=>{localStorage.setItem('sv_items',JSON.stringify(items));localStorage.setItem('sv_rates',JSON.stringify(rates));localStorage.setItem('sv_known',JSON.stringify(known));localStorage.setItem('sv_cfg',JSON.stringify(cfg));localStorage.setItem('sv_chk',JSON.stringify(chk));localStorage.setItem('sv_chklist',JSON.stringify(chkList));notify()};
 const key=n=>n.trim().toLowerCase();
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const num=n=>(+n.toFixed(2)).toLocaleString('pt-BR');
@@ -101,7 +103,8 @@ const br=d=>d.split('-').reverse().join('/');
 const today=()=>{const t=new Date();return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')};
 let rev=localStorage.getItem('sv_rev')||today();localStorage.setItem('sv_rev',rev);
 const daysSince=d=>Math.round((new Date(today()+'T12:00:00')-new Date(d+'T12:00:00'))/864e5);
-const CHK=[['Equipamentos e ferramentas',['Apito de longo alcance','Canivete multifuncional','Lanterna de dínamo (ou com pilhas extras)','Corda (3 metros / 6 mm)','Isqueiro e velas','Capa de chuva','Garrafa de água (500 ml)','Talheres descartáveis']],['Primeiros socorros e documentos',['Manta térmica aluminizada','Máscaras (KN95 ou descartáveis)','Gaze, ataduras e curativos','Luvas descartáveis','Soro fisiológico (100 ml)','Hipoclorito de sódio (30 ml, para purificar água)','Porta-documentos impermeável (cópias de RG, CPF e certidões)','Porta-remédios (medicações de uso contínuo)']],['Higiene pessoal',['Necessaire','Escova, creme dental e fio dental','Sabonete','Pente e lixa de unha','Absorventes','Repelente','Álcool em gel']]];
+const CHK0=[['Equipamentos e ferramentas',['Apito de longo alcance','Canivete multifuncional','Lanterna de dínamo (ou com pilhas extras)','Corda (3 metros / 6 mm)','Isqueiro e velas','Capa de chuva','Garrafa de água (500 ml)','Talheres descartáveis']],['Primeiros socorros e documentos',['Manta térmica aluminizada','Máscaras (KN95 ou descartáveis)','Gaze, ataduras e curativos','Luvas descartáveis','Soro fisiológico (100 ml)','Hipoclorito de sódio (30 ml, para purificar água)','Porta-documentos impermeável (cópias de RG, CPF e certidões)','Porta-remédios (medicações de uso contínuo)']],['Higiene pessoal',['Necessaire','Escova, creme dental e fio dental','Sabonete','Pente e lixa de unha','Absorventes','Repelente','Álcool em gel']]];
+let chkList=L('sv_chklist')||JSON.parse(JSON.stringify(CHK0));
 function cover(){
   let w=0,f=0;
   items.filter(i=>sOf(i)==='mochila'&&dleft(i.exp)>=0).forEach(i=>{
@@ -115,6 +118,11 @@ function setCfg(){
   cfg={p:g('cp')||cfg.p,d:g('cd')||cfg.d,w:g('cw')||cfg.w,f:g('cf')||cfg.f};save();setCfgInputs();render();
 }
 function setCfgInputs(){$('#cp').value=cfg.p;$('#cd').value=cfg.d;$('#cw').value=cfg.w;$('#cf').value=cfg.f}
+function chkAdd(g){const t=(prompt('Novo item')||'').trim();if(!t)return;chkList[g][1].push(t);save();renderCheck()}
+function chkDel(g,i){const t=chkList[g][1][i];chkList[g][1].splice(i,1);delete chk[t];save();renderCheck()}
+function chkGroupAdd(){const t=(prompt('Nome do novo grupo')||'').trim();if(!t)return;chkList.push([t,[]]);save();renderCheck()}
+function chkGroupDel(g){if(!confirm('Remover o grupo e todos os itens dele?'))return;chkList[g][1].forEach(t=>delete chk[t]);chkList.splice(g,1);save();renderCheck()}
+function chkReset(){if(!confirm('Restaurar a lista padrão? Suas alterações na lista serão perdidas.'))return;chkList=JSON.parse(JSON.stringify(CHK0));chk={};save();renderCheck()}
 function tick(el){if(el.checked)chk[el.dataset.t]=1;else delete chk[el.dataset.t];save();renderCheck()}
 function conferi(){rev=today();localStorage.setItem('sv_rev',rev);save();render();toast('Conferência registrada. Próximo aviso em 6 meses.')}
 function onTipo(){
@@ -131,7 +139,13 @@ function renderCheck(){
   <div style="margin-top:8px" class="${ok?'':'warn-t'}">${ok?'Mochila pronta para '+cfg.d+' dias.':'Faltam '+(nw>=0.001?num(nw)+' L de água':'')+(nw>=0.001&&nf>=0.001?' e ':'')+(nf>=0.001?num(nf)+' porções de alimento':'')+'.'}</div>
   <div class="mut" style="margin-top:6px">Só conta o que está dentro da validade. Cadastre água e alimentos em Adicionar, escolhendo o tipo.</div></div>`;
   let tot=0,done=0,h='';
-  CHK.forEach(([t,l])=>{h+=`<h2>${t}</h2>`;l.forEach(x=>{tot++;if(chk[x])done++;h+=`<label class="ck"><input type="checkbox" ${chk[x]?'checked':''} data-t="${esc(x)}" onchange="tick(this)"><span>${esc(x)}</span></label>`})});
+  chkList.forEach(([t,l],gi)=>{
+    h+=`<h2>${esc(t)}${chkEdit?` <button class="mini" onclick="chkAdd(${gi})">+ Item</button> <button class="mini ghost" onclick="chkGroupDel(${gi})">Remover grupo</button>`:''}</h2>`;
+    l.forEach((x,ii)=>{tot++;if(chk[x])done++;
+      h+=chkEdit?`<div class="ck"><span>${esc(x)}</span><button class="mini ghost" onclick="chkDel(${gi},${ii})">Tirar</button></div>`
+        :`<label class="ck"><input type="checkbox" ${chk[x]?'checked':''} data-t="${esc(x)}" onchange="tick(this)"><span>${esc(x)}</span></label>`})});
+  if(chkEdit)h+='<div class="acts" style="margin-top:12px"><button class="mini" onclick="chkGroupAdd()">+ Novo grupo</button><button class="mini ghost" onclick="chkReset()">Restaurar padrão</button></div>';
+  $('#chkbtn').textContent=chkEdit?'Concluir edição':'Editar lista';
   $('#chkh').textContent=`Checklist (${done}/${tot})`;$('#chk').innerHTML=h;
   $('#rv').innerHTML=`<div class="card ${daysSince(rev)>180?'warn':''}"><h3>Revisão da mochila</h3><div class="mut">Última conferência: ${br(rev)}. A Defesa Civil recomenda conferir as validades a cada 6 meses.</div><div class="acts"><button class="mini" onclick="conferi()">Conferi hoje</button></div></div>`;
 }
@@ -142,6 +156,7 @@ function show(t){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
   $('nav').style.display=t==='home'?'none':'flex';$('#back').style.display=t==='home'?'none':'block';
   document.body.className=sp==='mochila'?'m':'';
+  $('#savebtn').textContent=editId?'Salvar alterações':'Guardar';$('#cancelbtn').style.display=editId?'block':'none';
   $('#ht').textContent=sp?NAME[sp]:'SalvO';$('#hs').textContent=sp?(sp==='mochila'?'Itens para levar em uma emergência':'Seus alimentos e validades'):'Escolha o que organizar';
   $('#mrow').style.display=sp==='mochila'?'none':'block';$('#tprow').style.display=sp==='mochila'?'block':'none';$('#navchk').style.display=sp==='mochila'?'':'none';
   $('#loc').placeholder=sp==='mochila'?'Ex.: bolso da frente':'Ex.: Prateleira 2, caixa B';
@@ -200,7 +215,7 @@ function renderItens(){
   groups(sp).filter(g=>!q||g.k.includes(q)||g.lots.some(l=>(l.loc||'').toLowerCase().includes(q))).forEach(g=>{
     const r=sp==='dispensa'?rates[g.k]:null;
     h+=`<div class="card ${g.lots.some(l=>l.d<0)?'bad':g.waste>0.005?'warn':''}"><h3>${esc(g.name)} · ${num(g.total)} ${g.unit}</h3>${sp==='dispensa'?`<div class="mut">${r&&r.m?'Consumo: '+num(r.m)+' '+g.unit+'/mês':'Sem consumo informado'}</div>`:''}`;
-    g.lots.forEach(l=>h+=`<div class="lot"><span><b>${esc(l.loc||'Sem local')}</b><br>${num(l.qty)} ${l.unit} · vence ${br(l.exp)} <span class="${l.d<0?'bad-t':l.d<=7?'warn-t':'mut'}">(${l.d<0?'vencido':l.d+' d'})</span></span><button class="mini ghost" onclick="del(${l.id})">Remover</button></div>`);
+    g.lots.forEach(l=>h+=`<div class="lot"><span><b>${esc(l.loc||'Sem local')}</b><br>${num(l.qty)} ${l.unit} · vence ${br(l.exp)} <span class="${l.d<0?'bad-t':l.d<=7?'warn-t':'mut'}">(${l.d<0?'vencido':l.d+' d'})</span></span><span style="display:flex;gap:6px"><button class="mini ghost" onclick="edit(${l.id})">Editar</button><button class="mini ghost" onclick="del(${l.id})">Remover</button></span></div>`);
     h+=`<div class="acts"><button class="mini" data-k="${esc(g.k)}" onclick="use(this.dataset.k)">Usei</button>${sp==='dispensa'?`<button class="mini ghost" data-k="${esc(g.k)}" onclick="rate(this.dataset.k)">Consumo</button>`:''}</div></div>`;
   });
   $('#lista').innerHTML=h||'<div class="empty">Nada encontrado.</div>';
@@ -220,6 +235,17 @@ function rate(k){
   const a=prompt(`Consumo por mês de ${g.name} (${g.unit})`,rates[k]?rates[k].m:'');
   if(a===null)return;rates[k]={m:parseFloat(a.replace(',','.'))||0,unit:g.unit};save();render();
 }
+function clearForm(){['n','qt','e','loc','m','code'].forEach(i=>$('#'+i).value='');$('#tp').value='outro';editId=null}
+function newItem(){clearForm();show('novo')}
+function cancelEdit(){clearForm();show('itens')}
+function edit(id){
+  const i=items.find(x=>x.id===id);if(!i)return;
+  clearForm();editId=id;
+  $('#n').value=i.name;$('#qt').value=i.qty;$('#u').value=i.unit;$('#e').value=i.exp;$('#loc').value=i.loc||'';$('#code').value=i.code||'';
+  $('#tp').value=i.tp||'outro';
+  const r=sp==='dispensa'&&rates[key(i.name)];if(r&&r.m)$('#m').value=r.m;
+  show('novo');
+}
 function del(id){if(confirm('Remover este lote?')){items=items.filter(i=>i.id!==id);save();render()}}
 
 function prefill(){const r=sp==='dispensa'&&rates[key($('#n').value)];if(r){$('#u').value=r.unit;if(r.m)$('#m').value=r.m}}
@@ -227,12 +253,14 @@ function add(){
   const name=$('#n').value.trim(),qty=parseFloat($('#qt').value),exp=$('#e').value;
   if(!name||!(qty>0)||!exp)return toast('Preencha produto, quantidade e validade.');
   const u=$('#u').value,code=$('#code').value;
-  items.push({id:Date.now(),space:sp,tp:sp==='mochila'?$('#tp').value:undefined,name,qty,unit:u,exp,loc:$('#loc').value.trim(),code});
+  const tp=sp==='mochila'?$('#tp').value:undefined,loc=$('#loc').value.trim(),cur=editId&&items.find(x=>x.id===editId);
+  if(cur)Object.assign(cur,{tp,name,qty,unit:u,exp,loc,code:code||cur.code});
+  else items.push({id:Date.now(),space:sp,tp,name,qty,unit:u,exp,loc,code});
   const m=parseFloat($('#m').value);
   if(sp==='dispensa'&&m>=0&&$('#m').value!=='')rates[key(name)]={m,unit:u};
   if(code)known[code]={name,unit:u};
-  save();['n','qt','e','loc','m','code'].forEach(i=>$('#'+i).value='');$('#tp').value='outro';
-  toast('Guardado!');show('itens');
+  save();const was=!!cur;clearForm();
+  toast(was?'Alterações salvas!':'Guardado!');show('itens');
 }
 
 async function scan(){
