@@ -47,8 +47,30 @@ nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
 .ck span{flex:1}
 .ck input{width:22px;height:22px;flex:none;padding:0}
 .ck:has(input:checked) span{color:var(--mut);text-decoration:line-through}
+/* Identidade preto + amarelo (mochila de emergência) */
+:root{--blk:#15181a;--bg:#eeeee8;--line:#dcdcd2}
+header{background:var(--blk);border-bottom:4px solid var(--yel);padding:calc(env(safe-area-inset-top,0px) + 16px) 16px 14px}
+header h1,body.m header h1{color:var(--yel);font-weight:800;font-size:24px}
+header p{color:#d8d8d0;opacity:1}
+#logo{width:42px;height:42px;flex:none;color:var(--yel)}#logo svg{width:100%;height:100%}
+#back{background:#2a2f31;color:var(--yel)}
+h2{font-size:13px;letter-spacing:1.2px;text-transform:uppercase;color:var(--blk);display:inline-block;border-bottom:3px solid var(--yel);padding-bottom:2px;margin:20px 0 10px}
+.space{box-shadow:0 2px 0 rgba(0,0,0,.18)}
+.space h3{text-transform:uppercase;letter-spacing:.6px;font-weight:800;display:inline-block;border-bottom:3px solid var(--yel);padding-bottom:2px;margin-bottom:6px}
+.space.d{background:#1f4a3d;color:var(--yel)}.space.m{background:var(--blk)}
+.space.d div div{color:#e3eee9}
+.card{border-radius:12px;box-shadow:0 1px 0 rgba(0,0,0,.06)}
+button{background:var(--blk);color:var(--yel)}
+button.ghost{background:#e4e3d6;color:var(--blk)}
+nav{background:var(--blk);border-top:0}
+nav button{color:#a7aca8}
+nav button.on{color:var(--yel);box-shadow:inset 0 3px 0 var(--yel)}
+#toast{background:var(--blk);color:#fff;border:2px solid var(--yel)}
+input:focus,select:focus{outline:2px solid var(--yel);border-color:var(--blk)}
+.bar i{background:var(--yel)}.bar{background:#d9d8cc}
+.pill{border-color:var(--bg)}
 </style></head><body>
-<header><button id="back" onclick="goHome()">‹</button><div><h1 id="ht">SalvO</h1><p id="hs">Escolha o que organizar</p></div></header>
+<header><button id="back" onclick="goHome()">‹</button><span id="logo"></span><div><h1 id="ht">SalvO</h1><p id="hs">Escolha o que organizar</p></div></header>
 <main>
 <section id="s-home" class="on"></section>
 <section id="s-resumo"></section>
@@ -100,7 +122,7 @@ let items=L('sv_items')||[],rates=L('sv_rates')||{},known=L('sv_known')||{},sp=n
 const sOf=i=>i.space||'dispensa';
 const isPack=s=>!!s&&s!=='dispensa';
 const P=(id=sp)=>packs.find(p=>p.id===id);
-const nameOf=s=>s==='dispensa'?'Dispensa':(P(s)||{name:'Mochila'}).name;
+const nameOf=s=>s==='dispensa'?'Despensa':(P(s)||{name:'Mochila'}).name;
 const ICON={
  dispensa:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><rect x="9" y="6" width="46" height="52" rx="5"/><path d="M9 23h46M9 40h46"/><rect x="15" y="11" width="9" height="12" fill="currentColor" stroke="none"/><rect x="28" y="14" width="8" height="9" fill="currentColor" stroke="none"/><rect x="18" y="28" width="12" height="12" fill="currentColor" stroke="none"/><rect x="38" y="30" width="9" height="10" fill="currentColor" stroke="none"/></svg>',
  mochila:'<svg viewBox="0 0 64 64"><path d="M24 15c0-6 3-9 8-9s8 3 8 9" fill="none" stroke="currentColor" stroke-width="3.5"/><rect x="8" y="34" width="6" height="16" rx="2" fill="currentColor" opacity=".6"/><rect x="50" y="34" width="6" height="16" rx="2" fill="currentColor" opacity=".6"/><rect x="13" y="13" width="38" height="46" rx="11" fill="currentColor"/><path d="M19 30h26" stroke="#181c1a" stroke-width="2.5"/><rect x="20" y="36" width="24" height="17" rx="5" fill="#181c1a"/></svg>'};
@@ -203,6 +225,7 @@ function renderCheck(){
 function toast(t){const el=$('#toast');el.textContent=t;el.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>el.style.display='none',3500)}
 
 function show(t){
+  $('#logo').style.display=t==='home'?'block':'none';
   document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==='s-'+t));
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
   $('nav').style.display=t==='home'?'none':'flex';$('#back').style.display=t==='home'?'none':'block';
@@ -358,12 +381,12 @@ async function doNotify(){
           else offs.forEach(o=>{const d=new Date(l.exp+'T09:00:00');d.setDate(d.getDate()-o);push(d,`${tt}: ${g.name} ${o?'vence em '+o+' dia(s)':'vence hoje'}`,info)});
         });
         const w=g.lots.filter(l=>l.d>=0).reduce((a,l)=>a+l.waste,0);
-        if(g.perDay&&w>0.005){const m=`Pode sobrar ~${num(w)} ${g.unit}. Use mais ou doe.`;push(n9,`Dispensa: risco de perder ${g.name}`,m);push(n9b,`Dispensa: risco de perder ${g.name}`,m)}
+        if(g.perDay&&w>0.005){const m=`Pode sobrar ~${num(w)} ${g.unit}. Use mais ou doe.`;push(n9,`Despensa: risco de perder ${g.name}`,m);push(n9b,`Despensa: risco de perder ${g.name}`,m)}
       });
     });
     packs.forEach(p=>{const d=new Date(p.rev+'T09:00:00');d.setDate(d.getDate()+180);push(d,p.name+': hora de revisar','Confira as validades e o checklist.')});
     if(list.length)await N.schedule({notifications:list});
   }catch(e){}
 }
-render();notify();
+$('#logo').innerHTML=ICON.mochila;render();notify();
 </script></body></html>
