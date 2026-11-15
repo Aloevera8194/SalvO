@@ -60,7 +60,7 @@ nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
   <div id="cover"></div>
   <h2>Ajustes</h2>
   <div class="row"><div><label>Pessoas</label><input id="cp" type="number" inputmode="decimal" onchange="setCfg()"></div><div><label>Meta (dias)</label><input id="cd" type="number" inputmode="decimal" onchange="setCfg()"></div></div>
-  <div class="row"><div><label>Água (L/pessoa/dia)</label><input id="cw" type="number" inputmode="decimal" step="any" onchange="setCfg()"></div><div><label>Porções/pessoa/dia</label><input id="cf" type="number" inputmode="decimal" step="any" onchange="setCfg()"></div></div>
+  <div class="row"><div><label>Água (L/pessoa/dia; 0 = não exigir)</label><input id="cw" type="number" inputmode="decimal" step="any" onchange="setCfg()"></div><div><label>Porções/pessoa/dia</label><input id="cf" type="number" inputmode="decimal" step="any" onchange="setCfg()"></div></div>
   <p class="mut">Referência da Defesa Civil Nacional: kit para 72 horas (3 dias), com 2 litros de água por pessoa por dia.</p>
   <div class="acts"><button class="mini ghost" onclick="packRename()">Renomear mochila</button><button class="mini ghost" onclick="packDel()">Excluir mochila</button></div>
   <h2 id="chkh">Checklist</h2><div class="acts" style="margin:0 0 6px"><button class="mini ghost" id="chkbtn" onclick="chkEdit=!chkEdit;renderCheck()">Editar lista</button></div><div id="chk"></div><div id="rv" style="margin-top:14px"></div>
@@ -115,12 +115,12 @@ function cover(p=P()){
   items.filter(i=>sOf(i)===p.id&&dleft(i.exp)>=0).forEach(i=>{
     if(i.tp==='agua')w+=i.unit==='L'?i.qty:i.unit==='ml'?i.qty/1000:0;
     else if(i.tp==='alimento'&&i.unit==='un')f+=i.qty});
-  const wd=w/(cfg.p*cfg.w),fd=f/(cfg.p*cfg.f);
+  const wd=cfg.w>0?w/(cfg.p*cfg.w):Infinity,fd=f/(cfg.p*cfg.f);
   return{w,f,wd,fd,days:Math.min(wd,fd)};
 }
 function setCfg(){
   const g=id=>{const v=parseFloat(($('#'+id).value||'').replace(',','.'));return v>0?v:null};
-  const cfg=P().cfg;P().cfg={p:g('cp')||cfg.p,d:g('cd')||cfg.d,w:g('cw')||cfg.w,f:g('cf')||cfg.f};save();setCfgInputs();render();
+  const cfg=P().cfg,gw=(()=>{const v=parseFloat(($('#cw').value||'').replace(',','.'));return v>=0?v:cfg.w})();P().cfg={p:g('cp')||cfg.p,d:g('cd')||cfg.d,w:gw,f:g('cf')||cfg.f};save();setCfgInputs();render();
 }
 function setCfgInputs(){const cfg=P().cfg;$('#cp').value=cfg.p;$('#cd').value=cfg.d;$('#cw').value=cfg.w;$('#cf').value=cfg.f}
 function chkAdd(g){const t=(prompt('Novo item')||'').trim();if(!t)return;P().list[g][1].push(t);save();renderCheck()}
@@ -139,7 +139,7 @@ function renderCheck(){
   const p=P(),cfg=p.cfg,chk=p.chk,rev=p.rev,chkList=p.list,v=cover(p),bar=(x,m)=>`<div class="bar"><i style="width:${Math.min(100,x/m*100)}%"></i></div>`;
   const nw=Math.max(0,cfg.d*cfg.p*cfg.w-v.w),nf=Math.max(0,cfg.d*cfg.p*cfg.f-v.f),ok=nw<0.001&&nf<0.001;
   $('#cover').innerHTML=`<div class="card ${ok?'':'warn'}"><h3>Autonomia: ${num(v.days)} de ${cfg.d} dias</h3>
-  <div class="mut">Água: ${num(v.w)} L · ${num(v.wd)} dia(s)</div>${bar(v.wd,cfg.d)}
+  <div class="mut">Água: ${num(v.w)} L${cfg.w>0?' · '+num(v.wd)+' dia(s)':' (não entra na meta)'}</div>${cfg.w>0?bar(v.wd,cfg.d):''}
   <div class="mut" style="margin-top:8px">Alimento: ${num(v.f)} porções · ${num(v.fd)} dia(s)</div>${bar(v.fd,cfg.d)}
   <div style="margin-top:8px" class="${ok?'':'warn-t'}">${ok?'Mochila pronta para '+cfg.d+' dias.':'Faltam '+(nw>=0.001?num(nw)+' L de água':'')+(nw>=0.001&&nf>=0.001?' e ':'')+(nf>=0.001?num(nf)+' porções de alimento':'')+'.'}</div>
   <div class="mut" style="margin-top:6px">Só conta o que está dentro da validade. Cadastre água e alimentos em Adicionar, escolhendo o tipo.</div></div>`;
