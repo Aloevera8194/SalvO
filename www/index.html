@@ -52,7 +52,8 @@ nav button.on{color:var(--pine);box-shadow:inset 0 3px 0 var(--pine)}
 header{background:var(--blk);border-bottom:4px solid var(--yel);padding:calc(env(safe-area-inset-top,0px) + 16px) 16px 14px}
 header h1,body.m header h1{color:var(--yel);font-weight:800;font-size:24px}
 header p{color:#d8d8d0;opacity:1}
-#logo{width:42px;height:42px;flex:none;color:var(--yel)}#logo svg{width:100%;height:100%}
+#logo{width:42px;height:42px;flex:none}#logo img{width:100%;height:100%;border-radius:10px;display:block}
+.space img.ico{width:62px;height:62px;border-radius:14px;flex:none}
 #back{background:#2a2f31;color:var(--yel)}
 h2{font-size:13px;letter-spacing:1.2px;text-transform:uppercase;color:var(--blk);display:inline-block;border-bottom:3px solid var(--yel);padding-bottom:2px;margin:20px 0 10px}
 .space{box-shadow:0 2px 0 rgba(0,0,0,.18)}
@@ -267,7 +268,7 @@ function alerts(s){
 function renderHome(){
   $('#s-home').innerHTML=['dispensa',...packs.map(p=>p.id)].map(s=>{
     const a=alerts(s),c=a.exp.length+a.risk.length+a.soon.length+a.low.length+(a.cov?1:0)+(a.rev?1:0),n=items.filter(i=>sOf(i)===s).length;
-    return `<div class="space ${s==='dispensa'?'d':'m'}" onclick="openSp('${s}')">${ICON[isPack(s)?'mochila':'dispensa']}<div><h3>${esc(nameOf(s))}</h3><div>${n} item(ns)${isPack(s)?' · '+(ptype(P(s))==='familia'?P(s).cfg.p+' pessoas':'individual')+' · autonomia '+num(cover(P(s)).days)+' de '+P(s).cfg.d+' dias':''}${c?' · '+c+' alerta(s)':''}</div></div>${c?`<span class="pill">${c}</span>`:''}</div>`}).join('')+'<button class="ghost full" onclick="packAdd()">+ Nova mochila</button><h2>Backup</h2><div class="row"><button class="ghost" onclick="exportBk()">Exportar</button><button class="ghost" onclick="pickBk()">Importar</button></div><p class="mut">Exporte e escolha o Google Drive na tela de compartilhar. Para restaurar, importe o arquivo salvo.</p>';
+    return `<div class="space ${s==='dispensa'?'d':'m'}" onclick="openSp('${s}')">${isPack(s)?'<img class="ico" src="icon.png" alt="">':ICON.dispensa}<div><h3>${esc(nameOf(s))}</h3><div>${n} item(ns)${isPack(s)?' · '+(ptype(P(s))==='familia'?P(s).cfg.p+' pessoas':'individual')+' · autonomia '+num(cover(P(s)).days)+' de '+P(s).cfg.d+' dias':''}${c?' · '+c+' alerta(s)':''}</div></div>${c?`<span class="pill">${c}</span>`:''}</div>`}).join('')+'<button class="ghost full" onclick="packAdd()">+ Nova mochila</button><h2>Backup</h2><div class="row"><button class="ghost" onclick="exportBk()">Exportar</button><button class="ghost" onclick="pickBk()">Importar</button></div><p class="mut">Exporte e escolha o Google Drive na tela de compartilhar. Para restaurar, importe o arquivo salvo.</p>';
 }
 function renderResumo(){
   const a=alerts(sp);let h='';
@@ -383,10 +384,11 @@ async function doNotify(){
         const w=g.lots.filter(l=>l.d>=0).reduce((a,l)=>a+l.waste,0);
         if(g.perDay&&w>0.005){const m=`Pode sobrar ~${num(w)} ${g.unit}. Use mais ou doe.`;push(n9,`Despensa: risco de perder ${g.name}`,m);push(n9b,`Despensa: risco de perder ${g.name}`,m)}
       });
+      if(isPack(s)){const pk=P(s),v=cover(pk),c=pk.cfg;if(v.days<c.d-0.001){const lim=c.w>0&&v.wd<v.fd?'água':'alimento',m=`Cobre ${num(v.days)} de ${c.d} dias. Limitado por ${lim}.`;push(n9,`${pk.name}: autonomia abaixo da meta`,m);push(n9b,`${pk.name}: autonomia abaixo da meta`,m)}}
     });
     packs.forEach(p=>{const d=new Date(p.rev+'T09:00:00');d.setDate(d.getDate()+180);push(d,p.name+': hora de revisar','Confira as validades e o checklist.')});
     if(list.length)await N.schedule({notifications:list});
   }catch(e){}
 }
-$('#logo').innerHTML=ICON.mochila;render();notify();
+$('#logo').innerHTML='<img src="icon.png" alt="">';render();notify();
 </script></body></html>
